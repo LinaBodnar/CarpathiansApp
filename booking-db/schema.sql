@@ -62,7 +62,7 @@ BEGIN
         CONSTRAINT CK_Departures_SeatsTotal CHECK (SeatsTotal > 0),
         CONSTRAINT CK_Departures_SeatsAvailable CHECK (SeatsAvailable >= 0 AND SeatsAvailable <= SeatsTotal)
     );
-
+-- Пошук доступних (не видалених і з вільними місцями) відправлень на конкретну дату з вибіркою маршруту, ціни та кількості вільних місць.
     CREATE INDEX IX_Departures_Open_ByDate
         ON dbo.Departures (DepartureDate)
         INCLUDE (RouteId, Price, SeatsAvailable)
@@ -90,7 +90,7 @@ BEGIN
             ('Submitted', 'AwaitingValidation', 'SeatsConfirmed', 'Paid', 'Completed', 'Cancelled')),
         CONSTRAINT CK_Bookings_TotalAmount CHECK (TotalAmount >= 0)
     );
-
+-- Пошук активних (не видалених) бронювань певного клієнта за його ID та статусом із вибіркою дати і загальної суми.
     CREATE INDEX IX_Bookings_Customer_Status
         ON dbo.Bookings (CustomerId, Status)
         INCLUDE (BookingDate, TotalAmount)
@@ -128,7 +128,7 @@ BEGIN
         CONSTRAINT CK_BookingItems_UnitPrice CHECK (UnitPrice > 0),
         CONSTRAINT CK_BookingItems_Seats CHECK (Seats > 0)
     );
-
+-- Пошук позицій бронювань за ідентифікатором відправлення (DepartureId) з отриманням кількості заброньованих місць.
     CREATE INDEX IX_BookingItems_DepartureId
         ON dbo.BookingItems (DepartureId)
         INCLUDE (Seats);
@@ -152,7 +152,7 @@ BEGIN
         CONSTRAINT CK_Payments_Method CHECK (Method IN ('Card', 'Cash', 'Transfer')),
         CONSTRAINT CK_Payments_Status CHECK (Status IN ('Pending', 'Succeeded', 'Failed', 'Refunded'))
     );
-
+-- Пошук та перевірка платежів за конкретним бронюванням (BookingId) із вибіркою суми та статусу платжі.
     CREATE INDEX IX_Payments_BookingId
         ON dbo.Payments (BookingId)
         INCLUDE (Amount, Status);
@@ -173,7 +173,7 @@ BEGIN
         CONSTRAINT CK_BSH_NewStatus CHECK (NewStatus IN
             ('Submitted', 'AwaitingValidation', 'SeatsConfirmed', 'Paid', 'Completed', 'Cancelled'))
     );
-
+-- Перегляд історії зміни статусів конкретного бронювання (BookingId), відсортованої або відфільтрованої за часом зміни (ChangedAt).
     CREATE INDEX IX_BSH_Booking_ChangedAt
         ON dbo.BookingStatusHistory (BookingId, ChangedAt);
 END
