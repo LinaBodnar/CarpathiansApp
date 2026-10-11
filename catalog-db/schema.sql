@@ -161,3 +161,11 @@ END
 GO
   
 GO
+/* =====================================================================
+   Приклад створення логіна застосунку (Принцип найменших привілеїв)
+   =====================================================================
+   CREATE LOGIN CatalogAppPasswordUser WITH PASSWORD = 'StrongAppPassword123!';
+   CREATE USER CatalogAppUser FOR LOGIN CatalogAppPasswordUser;
+   ALTER ROLE db_datareader ADD MEMBER CatalogAppUser;
+   ALTER ROLE db_datawriter ADD MEMBER CatalogAppUser;
+   ===================================================================== */
