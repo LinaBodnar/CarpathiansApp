@@ -1,1 +1,111 @@
+Project Carpathians_CatalogContext {
+  database_type: 'SQLServer'
+  Note: 'CatalogContext: SQL Server + EF Core Code First. Жодних FK на інші БД.'
+}
 
+Table Regions {
+  Id int [pk, increment]
+  Name nvarchar(100) [not null, unique]
+  Description nvarchar(500)
+}
+
+Table Routes {
+  Id bigint [pk, increment]
+  RegionId int [not null]
+  Name nvarchar(200) [not null]
+  Slug nvarchar(200) [not null, unique]
+  Difficulty nvarchar(20) [not null, default: 'Moderate', note: 'Easy, Moderate, Hard']
+  DistanceKm decimal(6,2) [not null, note: 'CHECK > 0']
+  DurationHours decimal(5,1) [not null, note: 'CHECK > 0']
+  ElevationGainM int [not null, default: 0, note: 'CHECK >= 0']
+  CreatedAt datetime2 [not null]
+  CreatedBy nvarchar(100)
+  UpdatedAt datetime2
+  UpdatedBy nvarchar(100)
+  IsDeleted bit [not null, default: 0]
+  RowVersion rowversion
+
+  indexes {
+    (RegionId, Difficulty) [name: 'IX_Routes_Region_Difficulty (filtered: IsDeleted = 0)']
+  }
+  Note: 'Корінь агрегату Маршрут.'
+}
+
+Table RouteDetails {
+  RouteId bigint [pk]
+  Description nvarchar(max) [not null]
+  Season nvarchar(100)
+  MaxAltitudeM int
+  StartPoint nvarchar(200)
+  Requirements nvarchar(1000)
+  Note: '1:1 з Routes (FK = PK).'
+}
+
+Table Points {
+  Id bigint [pk, increment]
+  Name nvarchar(200) [not null, unique]
+  Latitude decimal(9,6) [not null, note: 'CHECK -90..90']
+  Longitude decimal(9,6) [not null, note: 'CHECK -180..180']
+  AltitudeM int
+  PointType nvarchar(30) [not null, default: 'Viewpoint', note: 'Trailhead, Peak, Lake, Shelter, Viewpoint']
+  CreatedAt datetime2 [not null]
+  UpdatedAt datetime2
+  IsDeleted bit [not null, default: 0]
+
+  indexes {
+    (Latitude, Longitude) [name: 'IX_Points_Coordinates (filtered: IsDeleted = 0)']
+  }
+}
+
+Table RoutePoints {
+  RouteId bigint [not null]
+  PointId bigint [not null]
+  SequenceNo int [not null, note: 'CHECK > 0']
+  AddedAt datetime2 [not null]
+
+  indexes {
+    (RouteId, PointId) [pk]
+    (RouteId, SequenceNo) [unique, name: 'UQ_RoutePoints_Route_Sequence']
+    PointId [name: 'IX_RoutePoints_PointId']
+  }
+  Note: 'Проміжна таблиця M:N Routes <-> Points із власними полями.'
+}
+
+Table GalleryImages {
+  Id bigint [pk, increment]
+  PointId bigint [not null]
+  FileName nvarchar(260) [not null]
+  Url nvarchar(500) [not null]
+  Caption nvarchar(300)
+  SortOrder int [not null, default: 0]
+  UploadedAt datetime2 [not null]
+
+  indexes {
+    (PointId, FileName) [unique, name: 'UQ_GalleryImages_Point_FileName']
+    (PointId, SortOrder) [name: 'IX_GalleryImages_Point_Sort']
+  }
+}
+
+Table GearItems {
+  Id bigint [pk, increment]
+  RouteId bigint [not null]
+  Name nvarchar(150) [not null]
+  IsRequired bit [not null, default: 1]
+  Notes nvarchar(300)
+
+  indexes {
+    (RouteId, Name) [unique, name: 'UQ_GearItems_Route_Name']
+  }
+}
+
+// 1:N
+Ref FK_Routes_Regions: Routes.RegionId > Regions.Id
+Ref FK_GalleryImages_Points: GalleryImages.PointId > Points.Id [delete: cascade]
+Ref FK_GearItems_Routes: GearItems.RouteId > Routes.Id [delete: cascade]
+
+// 1:1 (каскад)
+Ref FK_RouteDetails_Routes: RouteDetails.RouteId - Routes.Id [delete: cascade]
+
+// M:N через RoutePoints
+Ref FK_RoutePoints_Routes: RoutePoints.RouteId > Routes.Id [delete: cascade]
+Ref FK_RoutePoints_Points: RoutePoints.PointId > Points.Id
