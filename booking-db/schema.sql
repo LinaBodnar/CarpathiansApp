@@ -180,3 +180,12 @@ END
 GO
 
 GO
+
+/* =====================================================================
+   Приклад створення логіна застосунку (Принцип найменших привілеїв)
+   =====================================================================
+   CREATE LOGIN BookingAppUser WITH PASSWORD = 'StrongAppPassword123!';
+   CREATE USER BookingAppUser FOR LOGIN BookingAppUser;
+   ALTER ROLE db_datareader ADD MEMBER BookingAppUser;
+   ALTER ROLE db_datawriter ADD MEMBER BookingAppUser;
+   ===================================================================== */
