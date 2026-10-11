@@ -1,1 +1,128 @@
+Project Carpathians_BookingContext {
+  database_type: 'SQLServer'
+  Note: 'BookingContext: SQL Server + ADO.NET/Dapper. Жодних FK на інші БД.'
+}
 
+Table Customers {
+  Id bigint [pk, increment]
+  Email nvarchar(256) [not null, unique]
+  FullName nvarchar(200) [not null]
+  Phone nvarchar(30)
+  CreatedAt datetime2 [not null]
+  CreatedBy nvarchar(100)
+  UpdatedAt datetime2
+  UpdatedBy nvarchar(100)
+  IsDeleted bit [not null, default: 0]
+  RowVersion rowversion
+  Note: 'Окремий корінь. Клієнт існує незалежно від бронювань (без каскаду).'
+}
+
+Table RouteRefs {
+  Id bigint [pk, note: 'той самий Id, що Routes.Id у БД Каталогу; без IDENTITY і без FK']
+  Name nvarchar(200) [not null]
+  UpdatedAt datetime2 [not null]
+  Note: 'Локальна копія довідника з Каталогу (копія для читання, оновлюється подіями).'
+}
+
+Table Departures {
+  Id bigint [pk, increment]
+  RouteId bigint [not null]
+  DepartureDate date [not null]
+  Price decimal(18,2) [not null, note: 'CHECK Price > 0']
+  SeatsTotal int [not null, note: 'CHECK > 0']
+  SeatsAvailable int [not null, note: 'CHECK 0..SeatsTotal']
+  CreatedAt datetime2 [not null]
+  CreatedBy nvarchar(100)
+  UpdatedAt datetime2
+  UpdatedBy nvarchar(100)
+  IsDeleted bit [not null, default: 0]
+  RowVersion rowversion
+
+  indexes {
+    (RouteId, DepartureDate) [unique, name: 'UQ_Departures_Route_Date']
+    DepartureDate [name: 'IX_Departures_Open_ByDate (filtered: SeatsAvailable > 0)']
+  }
+}
+
+Table Bookings {
+  Id bigint [pk, increment]
+  CustomerId bigint [not null]
+  Status nvarchar(30) [not null, default: 'Submitted', note: 'Submitted, AwaitingValidation, SeatsConfirmed, Paid, Completed, Cancelled']
+  BookingDate datetime2 [not null]
+  TotalAmount decimal(18,2) [not null, default: 0]
+  CreatedAt datetime2 [not null]
+  CreatedBy nvarchar(100)
+  UpdatedAt datetime2
+  UpdatedBy nvarchar(100)
+  IsDeleted bit [not null, default: 0]
+  RowVersion rowversion
+
+  indexes {
+    (CustomerId, Status) [name: 'IX_Bookings_Customer_Status (filtered: IsDeleted = 0)']
+  }
+  Note: 'Корінь агрегату Бронювання.'
+}
+
+Table BookingDetails {
+  BookingId bigint [pk]
+  ContactPhone nvarchar(30) [not null]
+  MeetingPoint nvarchar(400) [not null]
+  Comment nvarchar(1000)
+  Note: '1:1 з Bookings (FK = PK).'
+}
+
+Table BookingItems {
+  BookingId bigint [not null]
+  DepartureId bigint [not null]
+  RouteName nvarchar(200) [not null, note: 'ЗНІМОК на момент оформлення']
+  UnitPrice decimal(18,2) [not null, note: 'ЗНІМОК Departures.Price на момент оформлення']
+  Seats int [not null, note: 'CHECK > 0']
+
+  indexes {
+    (BookingId, DepartureId) [pk]
+    DepartureId [name: 'IX_BookingItems_DepartureId']
+  }
+  Note: 'Проміжна таблиця M:N Bookings <-> Departures.'
+}
+
+Table Payments {
+  Id bigint [pk, increment]
+  BookingId bigint [not null]
+  Amount decimal(18,2) [not null]
+  Method nvarchar(20) [not null, note: 'Card, Cash, Transfer']
+  Status nvarchar(20) [not null, default: 'Pending', note: 'Pending, Succeeded, Failed, Refunded']
+  PaidAt datetime2
+  CreatedAt datetime2 [not null]
+  CreatedBy nvarchar(100)
+
+  indexes {
+    BookingId [name: 'IX_Payments_BookingId']
+  }
+}
+
+Table BookingStatusHistory {
+  Id bigint [pk, increment]
+  BookingId bigint [not null]
+  OldStatus nvarchar(30)
+  NewStatus nvarchar(30) [not null]
+  ChangedAt datetime2 [not null]
+  ChangedBy nvarchar(100)
+
+  indexes {
+    (BookingId, ChangedAt) [name: 'IX_BSH_Booking_ChangedAt']
+  }
+  Note: 'Аудит змін статусу.'
+}
+
+// 1:N
+Ref FK_Departures_RouteRefs: Departures.RouteId > RouteRefs.Id
+Ref FK_Bookings_Customers: Bookings.CustomerId > Customers.Id
+Ref FK_Payments_Bookings: Payments.BookingId > Bookings.Id
+Ref FK_BSH_Bookings: BookingStatusHistory.BookingId > Bookings.Id
+
+// 1:1 (каскад)
+Ref FK_BookingDetails_Bookings: BookingDetails.BookingId - Bookings.Id [delete: cascade]
+
+// M:N через BookingItems (каскад від бронювання)
+Ref FK_BookingItems_Bookings: BookingItems.BookingId > Bookings.Id [delete: cascade]
+Ref FK_BookingItems_Departures: BookingItems.DepartureId > Departures.Id
