@@ -158,3 +158,144 @@ Cancelled - лише зі Submitted, AwaitingValidation, SeatsConfirmed (до о
 ## 11. Права доступу
 
 У кінці `booking-db/schema.sql` і `catalog-db/schema.sql` наведено закоментований приклад окремого логіна застосунку з доступом лише до своєї БД (принцип найменших привілеїв).
+
+## 12. Booking Service (Лаб. 02)
+
+Мікросервіс контексту «Бронювання»: ASP.NET Core Web API, тришарова архітектура
+(Api -> Bll -> Dal), ADO.NET + Dapper, Unit of Work, .NET Aspire.
+
+### 12.1. Структура рішення
+
+```
+booking-service/
+├── Carpathians.Booking.Domain/   # моделі, константи, доменні винятки
+├── Carpathians.Booking.Dal/      # репозиторії (ADO.NET, Dapper), UnitOfWork
+├── Carpathians.Booking.Bll/      # сервіси, DTO, профілі AutoMapper
+├── Carpathians.Booking.Api/      # контролери, ProblemDetails, Swagger
+├── Carpathians.Booking.AppHost/  # .NET Aspire (API + SQL Server у контейнері)
+└── Carpathians.Booking.Tests/    # unit-тести (NUnit, NSubstitute)
+```
+
+Залежності спрямовані в один бік: Api -> Bll -> Dal; Domain підключають і Dal, і Bll.
+Контролер звертається лише до сервісів, SQL-запити є тільки в Dal.
+
+| Репозиторій | Реалізація |
+|---|---|
+| CustomerRepository | чистий ADO.NET (`SqlCommand`, `SqlDataReader`), Generic Repository не успадковує |
+| DepartureRepository | ADO.NET + Dapper, `BaseDapperRepository<T>` |
+| BookingRepository | ADO.NET + Dapper (multi-mapping, виклики збережених процедур) |
+
+### 12.2. Що потрібно для запуску
+
+- .NET SDK 9 (або 8)
+- Docker Desktop (SQL Server запускає Aspire)
+- Aspire CLI (Windows): `irm https://aspire.dev/install.ps1 | iex`, перевірка: `aspire --version`
+- Rider або Visual Studio
+- `sqlcmd` або Database-панель Rider для застосування SQL-скриптів
+
+### 12.3. Запуск через Aspire
+
+1. Запустіть Docker Desktop.
+2. Запустіть проєкт `Carpathians.Booking.AppHost` (з IDE або `dotnet run` у його папці).
+   Пароль SQL Server для локальної розробки задано в
+   `booking-service/Carpathians.Booking.AppHost/appsettings.Development.json`
+   (`Parameters:sql-password`). Це пароль лише локального контейнера.
+3. Aspire створить порожню базу `BookingContext` у контейнері (порт `14333`).
+   Застосуйте скрипти з кореня репозиторію в такому порядку:
+
+```bash
+sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i booking-db/schema.sql
+sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i booking-db/procedures.sql
+sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i booking-db/seed.sql
+```
+
+Прапорець `-I` обов'язковий. Замість `sqlcmd` можна виконати ці три файли в Database-панелі
+Rider або в SSMS, підключившись до `localhost,14333` (логін `sa`).
+4. Відкрийте Aspire Dashboard (посилання в консолі). Ресурси `sql`, `BookingDb`, `booking-api`
+   мають бути у статусі Running.
+5. URL API візьміть у Dashboard (ресурс `booking-api`). Swagger: `<url>/swagger`.
+
+Рядок підключення (`ConnectionStrings:BookingDb`) Aspire передає в API автоматично.
+У `appsettings.json` проєкту Api він заданий для запуску без Aspire і перевизначається змінною
+оточення `ConnectionStrings__BookingDb`.
+
+### 12.4. Ендпоінти
+
+| Метод і шлях | Опис | Статуси |
+|---|---|---|
+| GET, POST `/api/customers` | список, створення клієнта | 200, 201, 400, 409 |
+| GET, PUT, DELETE `/api/customers/{id}` | читання, оновлення, видалення | 200, 204, 400, 404, 409 |
+| GET, POST `/api/departures` | список, створення виїзду | 200, 201, 400, 409 |
+| GET, PUT, DELETE `/api/departures/{id}` | читання, оновлення, видалення | 200, 204, 400, 404 |
+| GET `/api/bookings/{id}` | бронювання з позиціями | 200, 404 |
+| POST `/api/bookings` | створення бронювання (транзакція) | 201, 400, 404, 409 |
+| POST `/api/bookings/{id}/confirm` | підтвердження місць (транзакція) | 204, 404, 409 |
+| POST `/api/bookings/{id}/pay` | оплата | 200, 400, 404, 409 |
+| POST `/api/bookings/{id}/cancel` | скасування | 204, 404, 409 |
+
+### 12.5. Обробка помилок
+
+Помилки повертаються у форматі ProblemDetails (RFC 9457) одним глобальним обробником
+(`IExceptionHandler`), контролери не містять `try/catch`.
+
+| Джерело | Виняток | HTTP |
+|---|---|---|
+| THROW 50001 (не знайдено) | `NotFoundException` | 404 |
+| THROW 50002 (недопустимий перехід статусу), 50003 (немає місць), 50007 | `BusinessConflictException` | 409 |
+| UNIQUE (2601, 2627), FK/CHECK (547) | `BusinessConflictException` | 409 |
+| THROW 50005, 50006 (некоректні параметри) | `ValidationException` | 400 |
+| DataAnnotations на DTO | `ValidationProblemDetails` | 400 |
+
+### 12.6. Транзакції та рівень ізоляції
+
+Unit of Work відкриває одне з'єднання й одну транзакцію на операцію; усі репозиторії
+працюють через них. Транзакційні сценарії:
+
+- `POST /api/bookings`: перевірка клієнта, зменшення вільних місць виїзду, створення
+  бронювання з деталями, позицій (знімок назви маршруту і ціни) та запису в історію статусів;
+- `POST /api/bookings/{id}/confirm`: послідовна зміна статусу через процедуру
+  `usp_ChangeBookingStatus`, допустимість переходу перевіряє процедура.
+
+Рівень ізоляції за замовчуванням: `ReadCommitted`, таймаут команд 30 с (за замовчуванням SqlClient).
+Нестача місць захищена умовним `UPDATE ... WHERE SeatsAvailable >= @Seats`, а процедури беруть `UPDLOCK`.
+Вищий рівень ізоляції (наприклад, Serializable) дає менше аномалій читання, але більше блокувань
+і ризик взаємних блокувань (deadlock); `ReadCommitted` обрано як баланс між узгодженістю й конкурентністю.
+Якщо одна з операцій транзакції завершується помилкою, усі зміни відкочуються.
+
+### 12.7. Безпека запитів
+
+Усі значення передаються в запити й процедури лише як параметри (SqlParameter / Dapper).
+Назва таблиці в `BaseDapperRepository<T>` є константою з коду, а не вхідними даними.
+Помилки SQL Server у Dal перетворюються на доменні винятки, текст SQL не потрапляє у відповідь API.
+
+### 12.8. Приклади запитів
+
+```bash
+# створити клієнта (апостроф у імені не ламає запит)
+curl -X POST <url>/api/customers -H "Content-Type: application/json" \
+  -d '{"email":"obrien@example.com","fullName":"Patrick O'\''Brien","phone":"+380501234567"}'
+
+# список виїздів (візьміть id з відповіді)
+curl <url>/api/departures
+
+# створити бронювання (транзакція)
+curl -X POST <url>/api/bookings -H "Content-Type: application/json" \
+  -d '{"customerId":1,"contactPhone":"+380501234567","meetingPoint":"Rakhiv","items":[{"departureId":1,"seats":2}]}'
+
+# підтвердити бронювання: 204
+curl -X POST <url>/api/bookings/1/confirm
+
+# повторно підтвердити: 409 (ProblemDetails)
+curl -X POST <url>/api/bookings/1/confirm
+
+# неіснуюче бронювання: 404 (ProblemDetails)
+curl <url>/api/bookings/99999
+```
+
+### 12.9. Тести
+
+Unit-тести BLL (мокається Unit of Work) і перевірка конфігурації AutoMapper:
+
+```bash
+dotnet test booking-service/Carpathians.Booking.Tests
+```
