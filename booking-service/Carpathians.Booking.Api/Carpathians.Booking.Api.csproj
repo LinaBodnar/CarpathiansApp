@@ -17,8 +17,4 @@
       <ProjectReference Include="..\Carpathians.Booking.Domain\Carpathians.Booking.Domain.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Controllers\" />
-    </ItemGroup>
-
 </Project>
