@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Bll", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Api", "Carpathians.Booking.Api\Carpathians.Booking.Api.csproj", "{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Tests", "Carpathians.Booking.Tests\Carpathians.Booking.Tests.csproj", "{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
