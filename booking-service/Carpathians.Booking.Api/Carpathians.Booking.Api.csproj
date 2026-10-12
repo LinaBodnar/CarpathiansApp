@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Serilog.AspNetCore" Version="10.0.1-dev-02312" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Carpathians.Booking.Bll\Carpathians.Booking.Bll.csproj" />
+      <ProjectReference Include="..\Carpathians.Booking.Dal\Carpathians.Booking.Dal.csproj" />
+      <ProjectReference Include="..\Carpathians.Booking.Domain\Carpathians.Booking.Domain.csproj" />
+    </ItemGroup>
+
+</Project>

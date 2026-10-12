@@ -1,0 +1,47 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# 
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Domain", "Carpathians.Booking.Domain\Carpathians.Booking.Domain.csproj", "{5169D242-B802-423E-A9AC-6BC686B42A1D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Dal", "Carpathians.Booking.Dal\Carpathians.Booking.Dal.csproj", "{24318BB7-7FF3-4EBA-9F5E-D5658C86772A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Bll", "Carpathians.Booking.Bll\Carpathians.Booking.Bll.csproj", "{C5F74C98-B8B1-4A56-856F-AEF593E325E9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Api", "Carpathians.Booking.Api\Carpathians.Booking.Api.csproj", "{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.Tests", "Carpathians.Booking.Tests\Carpathians.Booking.Tests.csproj", "{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Booking.AppHost", "Carpathians.Booking.AppHost\Carpathians.Booking.AppHost.csproj", "{03186FCC-3E67-4922-815B-E2F4F40527D9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5169D242-B802-423E-A9AC-6BC686B42A1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5169D242-B802-423E-A9AC-6BC686B42A1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5169D242-B802-423E-A9AC-6BC686B42A1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5169D242-B802-423E-A9AC-6BC686B42A1D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24318BB7-7FF3-4EBA-9F5E-D5658C86772A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24318BB7-7FF3-4EBA-9F5E-D5658C86772A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24318BB7-7FF3-4EBA-9F5E-D5658C86772A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24318BB7-7FF3-4EBA-9F5E-D5658C86772A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5F74C98-B8B1-4A56-856F-AEF593E325E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5F74C98-B8B1-4A56-856F-AEF593E325E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5F74C98-B8B1-4A56-856F-AEF593E325E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5F74C98-B8B1-4A56-856F-AEF593E325E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBB3E63B-C3B3-4F4E-865B-60B3A82EB7E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63D1479E-1816-4CF4-89C2-FFEBB9EB435E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{03186FCC-3E67-4922-815B-E2F4F40527D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{03186FCC-3E67-4922-815B-E2F4F40527D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{03186FCC-3E67-4922-815B-E2F4F40527D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{03186FCC-3E67-4922-815B-E2F4F40527D9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
