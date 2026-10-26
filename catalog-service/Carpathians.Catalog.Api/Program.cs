@@ -1,4 +1,6 @@
 using Carpathians.Dal.Data;
+using Carpathians.Dal.Interfaces;
+using Carpathians.Dal.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
@@ -13,10 +15,19 @@ builder.Host.UseSerilog((ctx, cfg) => cfg
     .Enrich.FromLogContext()
     .WriteTo.Console());
 
+// Database
 builder.Services.AddDbContext<CatalogDbContext>(o => o
     .UseSqlServer(connectionString)
     .ConfigureWarnings(w => w.Ignore(
         CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning)));
+
+// Repositories & Unit of Work
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IRouteRepository, RouteRepository>();
+builder.Services.AddScoped<IPointRepository, PointRepository>();
+builder.Services.AddScoped<IRoutePointRepository, RoutePointRepository>();
+builder.Services.AddScoped<IRegionRepository, RegionRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddControllers();
 
