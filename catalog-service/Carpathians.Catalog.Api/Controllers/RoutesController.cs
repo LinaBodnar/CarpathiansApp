@@ -12,9 +12,20 @@ public class RoutesController(IRouteService routes) : ControllerBase
     private readonly IRouteService _routes = routes;
 
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<RouteDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<RouteDto>>> GetAll(CancellationToken ct)
-        => Ok(await _routes.GetAllAsync(ct));
+    [ProducesResponseType(typeof(PagedResult<RouteDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<RouteDto>>> GetAll(
+        [FromQuery] RouteQueryParameters queryParams,
+        CancellationToken ct)
+    {
+        var result = await _routes.GetPagedAsync(queryParams, ct);
+
+        Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+        Response.Headers.Append("X-Page", result.Page.ToString());
+        Response.Headers.Append("X-Page-Size", result.PageSize.ToString());
+        Response.Headers.Append("X-Total-Pages", result.TotalPages.ToString());
+
+        return Ok(result);
+    }
 
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]

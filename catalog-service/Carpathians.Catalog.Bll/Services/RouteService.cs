@@ -18,6 +18,23 @@ public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
         return _mapper.Map<IReadOnlyList<RouteDto>>(routes);
     }
 
+    public async Task<PagedResult<RouteDto>> GetPagedAsync(RouteQueryParameters q, CancellationToken ct = default)
+    {
+        var (items, totalCount) = await _uow.Routes.GetPagedAsync(
+            q.Page,
+            q.PageSize,
+            q.Search,
+            q.RegionId,
+            q.Difficulty,
+            q.MaxDistanceKm,
+            q.SortBy,
+            q.SortDir,
+            ct);
+
+        var mapped = _mapper.Map<IReadOnlyList<RouteDto>>(items);
+        return new PagedResult<RouteDto>(mapped, totalCount, q.Page, q.PageSize);
+    }
+
     public async Task<RouteDto> GetByIdAsync(long id, CancellationToken ct = default)
     {
         var route = await _uow.Routes.GetWithDetailsEagerAsync(id, ct)

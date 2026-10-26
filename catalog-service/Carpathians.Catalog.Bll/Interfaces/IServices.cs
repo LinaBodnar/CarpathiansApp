@@ -6,6 +6,7 @@ namespace Carpathians.Bll.Interfaces;
 public interface IRouteService
 {
     Task<IReadOnlyList<RouteDto>> GetAllAsync(CancellationToken ct = default);
+    Task<PagedResult<RouteDto>> GetPagedAsync(RouteQueryParameters queryParams, CancellationToken ct = default);
     Task<RouteDto> GetByIdAsync(long id, CancellationToken ct = default);
     Task<RouteDto> GetWithDetailsExplicitAsync(long id, CancellationToken ct = default);
     Task<RouteDto> CreateAsync(CreateRouteDto input, CancellationToken ct = default);
