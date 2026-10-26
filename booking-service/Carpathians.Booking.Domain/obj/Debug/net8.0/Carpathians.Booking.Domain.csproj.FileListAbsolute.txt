@@ -1,0 +1,12 @@
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\bin\Debug\net8.0\Carpathians.Booking.Domain.deps.json
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\bin\Debug\net8.0\Carpathians.Booking.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\bin\Debug\net8.0\Carpathians.Booking.Domain.pdb
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.AssemblyInfoInputs.cache
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.AssemblyInfo.cs
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.csproj.CoreCompileInputs.cache
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.sourcelink.json
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\refint\Carpathians.Booking.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\Carpathians.Booking.Domain.pdb
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Domain\obj\Debug\net8.0\ref\Carpathians.Booking.Domain.dll

@@ -1,0 +1,16 @@
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\bin\Debug\net8.0\Carpathians.Booking.Dal.deps.json
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\bin\Debug\net8.0\Carpathians.Booking.Dal.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\bin\Debug\net8.0\Carpathians.Booking.Dal.pdb
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\bin\Debug\net8.0\Carpathians.Booking.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\bin\Debug\net8.0\Carpathians.Booking.Domain.pdb
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.csproj.AssemblyReference.cache
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.GeneratedMSBuildEditorConfig.editorconfig
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.AssemblyInfoInputs.cache
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.AssemblyInfo.cs
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.csproj.CoreCompileInputs.cache
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.sourcelink.json
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathi.6BEF730A.Up2Date
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\refint\Carpathians.Booking.Dal.dll
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\Carpathians.Booking.Dal.pdb
+D:\CarpathiansApp\CarpathiansApp\booking-service\Carpathians.Booking.Dal\obj\Debug\net8.0\ref\Carpathians.Booking.Dal.dll

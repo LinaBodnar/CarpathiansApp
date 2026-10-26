@@ -1,0 +1,315 @@
+{
+  "format": 1,
+  "restore": {
+    "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Tests\\Carpathians.Catalog.Tests.csproj": {}
+  },
+  "projects": {
+    "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Bll\\Carpathians.Catalog.Bll.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Bll\\Carpathians.Catalog.Bll.csproj",
+        "projectName": "Carpathians.Catalog.Bll",
+        "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Bll\\Carpathians.Catalog.Bll.csproj",
+        "packagesPath": "C:\\Users\\Home\\.nuget\\packages\\",
+        "outputPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Bll\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Home\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj": {
+                "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj"
+              },
+              "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj": {
+                "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "AutoMapper": {
+              "target": "Package",
+              "version": "[16.2.0, )"
+            },
+            "FluentValidation": {
+              "target": "Package",
+              "version": "[12.2.0, )"
+            },
+            "FluentValidation.DependencyInjectionExtensions": {
+              "target": "Package",
+              "version": "[12.2.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\Home\\.dotnet\\sdk\\8.0.421/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj",
+        "projectName": "Carpathians.Catalog.Dal",
+        "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj",
+        "packagesPath": "C:\\Users\\Home\\.nuget\\packages\\",
+        "outputPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Home\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj": {
+                "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Ardalis.Specification": {
+              "target": "Package",
+              "version": "[9.3.1, )"
+            },
+            "Ardalis.Specification.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[9.3.1, )"
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[8.*, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\Home\\.dotnet\\sdk\\8.0.421/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj",
+        "projectName": "Carpathians.Catalog.Domain",
+        "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj",
+        "packagesPath": "C:\\Users\\Home\\.nuget\\packages\\",
+        "outputPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Home\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\Home\\.dotnet\\sdk\\8.0.421/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Tests\\Carpathians.Catalog.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Tests\\Carpathians.Catalog.Tests.csproj",
+        "projectName": "Carpathians.Catalog.Tests",
+        "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Tests\\Carpathians.Catalog.Tests.csproj",
+        "packagesPath": "C:\\Users\\Home\\.nuget\\packages\\",
+        "outputPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Tests\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Home\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Bll\\Carpathians.Catalog.Bll.csproj": {
+                "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Bll\\Carpathians.Catalog.Bll.csproj"
+              },
+              "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj": {
+                "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Dal\\Carpathians.Catalog.Dal.csproj"
+              },
+              "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj": {
+                "projectPath": "D:\\CarpathiansApp\\CarpathiansApp\\catalog-service\\Carpathians.Catalog.Domain\\Carpathians.Catalog.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.8.0, )"
+            },
+            "NSubstitute": {
+              "target": "Package",
+              "version": "[6.2.0, )"
+            },
+            "NUnit": {
+              "target": "Package",
+              "version": "[3.14.0, )"
+            },
+            "NUnit.Analyzers": {
+              "target": "Package",
+              "version": "[3.9.0, )"
+            },
+            "NUnit3TestAdapter": {
+              "target": "Package",
+              "version": "[4.5.0, )"
+            },
+            "coverlet.collector": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\Home\\.dotnet\\sdk\\8.0.421/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
