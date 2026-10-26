@@ -1,3 +1,6 @@
+using Carpathians.Bll.Interfaces;
+using Carpathians.Bll.Mapping;
+using Carpathians.Bll.Services;
 using Carpathians.Dal.Data;
 using Carpathians.Dal.Interfaces;
 using Carpathians.Dal.Repositories;
@@ -28,6 +31,18 @@ builder.Services.AddScoped<IPointRepository, PointRepository>();
 builder.Services.AddScoped<IRoutePointRepository, RoutePointRepository>();
 builder.Services.AddScoped<IRegionRepository, RegionRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// AutoMapper (with LicenseKey as in Orders / Booking)
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"];
+    cfg.AddProfile<CatalogProfile>();
+});
+
+// BLL Services
+builder.Services.AddScoped<IRouteService, RouteService>();
+builder.Services.AddScoped<IPointService, PointService>();
+builder.Services.AddScoped<IRegionService, RegionService>();
 
 builder.Services.AddControllers();
 
