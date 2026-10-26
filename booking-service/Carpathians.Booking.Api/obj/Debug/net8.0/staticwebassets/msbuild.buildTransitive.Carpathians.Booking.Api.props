@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\buildMultiTargeting\Carpathians.Booking.Api.props" />
-</Project>
