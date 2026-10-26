@@ -1,10 +1,13 @@
+using Carpathians.Api.Filters;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
 using Carpathians.Bll.Services;
+using Carpathians.Bll.Validators;
 using Carpathians.Dal.Data;
 using Carpathians.Dal.Interfaces;
 using Carpathians.Dal.Repositories;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
@@ -40,6 +43,9 @@ builder.Services.AddAutoMapper(cfg =>
     cfg.AddProfile<CatalogProfile>();
 });
 
+// FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<CreateRouteDtoValidator>();
+
 // BLL Services
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<IPointService, PointService>();
@@ -51,7 +57,18 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 // Controllers & Swagger
-builder.Services.AddControllers();
+builder.Services.AddControllers(o =>
+{
+    o.Filters.Add<ValidationFilter>();
+    // Disable MVC's built-in model validation to avoid InvalidOperationException
+    // on record types with [property:] DataAnnotation attributes.
+    // Our ValidationFilter handles DataAnnotations + FluentValidation explicitly.
+    o.ModelValidatorProviders.Clear();
+});
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(o =>
+{
+    o.SuppressModelStateInvalidFilter = true;
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
