@@ -1,3 +1,5 @@
+using Ardalis.Specification;
+using Ardalis.Specification.EntityFrameworkCore;
 using Carpathians.Dal.Data;
 using Carpathians.Dal.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -23,4 +25,16 @@ public class GenericRepository<T>(CatalogDbContext context) : IGenericRepository
 
     public virtual void Delete(T entity)
         => DbSet.Remove(entity);
+
+    public virtual async Task<IReadOnlyList<T>> ListAsync(ISpecification<T> spec, CancellationToken ct = default)
+        => await ApplySpecification(spec).AsNoTracking().ToListAsync(ct);
+
+    public virtual async Task<int> CountAsync(ISpecification<T> spec, CancellationToken ct = default)
+        => await ApplySpecification(spec, evaluateCriteriaOnly: true).CountAsync(ct);
+
+    public virtual async Task<T?> FirstOrDefaultAsync(ISpecification<T> spec, CancellationToken ct = default)
+        => await ApplySpecification(spec).FirstOrDefaultAsync(ct);
+
+    protected IQueryable<T> ApplySpecification(ISpecification<T> spec, bool evaluateCriteriaOnly = false)
+        => SpecificationEvaluator.Default.GetQuery(DbSet.AsQueryable(), spec, evaluateCriteriaOnly);
 }

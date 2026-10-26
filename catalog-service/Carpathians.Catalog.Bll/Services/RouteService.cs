@@ -1,6 +1,7 @@
 using AutoMapper;
 using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
+using Carpathians.Bll.Specifications;
 using Carpathians.Dal.Interfaces;
 using Carpathians.Domain.Entities;
 using Carpathians.Domain.Exceptions;
@@ -20,19 +21,21 @@ public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
 
     public async Task<PagedResult<RouteDto>> GetPagedAsync(RouteQueryParameters q, CancellationToken ct = default)
     {
-        var (items, totalCount) = await _uow.Routes.GetPagedAsync(
-            q.Page,
-            q.PageSize,
-            q.Search,
-            q.RegionId,
-            q.Difficulty,
-            q.MaxDistanceKm,
-            q.SortBy,
-            q.SortDir,
-            ct);
+        var filterSpec = new RouteFilterPaginatedSpec(q);
+        var countSpec = new RouteFilterCountSpec(q);
+
+        var items = await _uow.Routes.ListAsync(filterSpec, ct);
+        var totalCount = await _uow.Routes.CountAsync(countSpec, ct);
 
         var mapped = _mapper.Map<IReadOnlyList<RouteDto>>(items);
         return new PagedResult<RouteDto>(mapped, totalCount, q.Page, q.PageSize);
+    }
+
+    public async Task<IReadOnlyList<RouteDto>> GetPopularChallengingAsync(CancellationToken ct = default)
+    {
+        var spec = new PopularChallengingRoutesSpec();
+        var items = await _uow.Routes.ListAsync(spec, ct);
+        return _mapper.Map<IReadOnlyList<RouteDto>>(items);
     }
 
     public async Task<RouteDto> GetByIdAsync(long id, CancellationToken ct = default)

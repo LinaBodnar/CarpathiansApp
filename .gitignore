@@ -1,4 +1,5 @@
 ## [Visual Studio / Rider / VS Code]
+.vs/
 .idea/
 .vscode/
 *.DotSettings.user
@@ -12,10 +13,16 @@
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+TestResults/
 
 ## [.NET Aspire]
 .aspire/
 
+## [Secrets & Local configs]
+*.local.json
+appsettings.*.local.json
+
 ## [OS generated]
 .DS_Store
 Thumbs.db
+desktop.ini

@@ -94,6 +94,7 @@ if (!app.Environment.IsProduction())
     }
 }
 
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();

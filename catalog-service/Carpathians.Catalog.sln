@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Api", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Tests", "Carpathians.Catalog.Tests\Carpathians.Catalog.Tests.csproj", "{32E640C0-86A9-4772-85A0-8438D775E9A0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.AppHost", "Carpathians.Catalog.AppHost\Carpathians.Catalog.AppHost.csproj", "{F3FF37FE-D349-412E-A583-0B137F19DD93}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3FF37FE-D349-412E-A583-0B137F19DD93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3FF37FE-D349-412E-A583-0B137F19DD93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3FF37FE-D349-412E-A583-0B137F19DD93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3FF37FE-D349-412E-A583-0B137F19DD93}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
