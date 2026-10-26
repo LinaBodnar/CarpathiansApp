@@ -1,0 +1,16 @@
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\bin\Debug\net8.0\Carpathians.Catalog.Dal.deps.json
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\bin\Debug\net8.0\Carpathians.Catalog.Dal.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\bin\Debug\net8.0\Carpathians.Catalog.Dal.pdb
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\bin\Debug\net8.0\Carpathians.Catalog.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\bin\Debug\net8.0\Carpathians.Catalog.Domain.pdb
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.csproj.AssemblyReference.cache
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.GeneratedMSBuildEditorConfig.editorconfig
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.AssemblyInfoInputs.cache
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.AssemblyInfo.cs
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.csproj.CoreCompileInputs.cache
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.sourcelink.json
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathi.6678D0B2.Up2Date
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\refint\Carpathians.Catalog.Dal.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\Carpathians.Catalog.Dal.pdb
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Dal\obj\Debug\net8.0\ref\Carpathians.Catalog.Dal.dll

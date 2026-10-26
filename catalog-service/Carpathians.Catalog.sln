@@ -3,6 +3,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Domain", "Carpathians.Catalog.Domain\Carpathians.Catalog.Domain.csproj", "{8958048E-48ED-4F68-98E7-316E1CA67EA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Dal", "Carpathians.Catalog.Dal\Carpathians.Catalog.Dal.csproj", "{2002C924-BB8C-49AC-AC05-8D19EE8C9F1A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Bll", "Carpathians.Catalog.Bll\Carpathians.Catalog.Bll.csproj", "{30A5E350-3722-4DD3-A9EE-3085A1DA3DAA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Api", "Carpathians.Catalog.Api\Carpathians.Catalog.Api.csproj", "{11295156-EF37-43D4-9572-A0C5839B13CF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carpathians.Catalog.Tests", "Carpathians.Catalog.Tests\Carpathians.Catalog.Tests.csproj", "{32E640C0-86A9-4772-85A0-8438D775E9A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -10,5 +20,27 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8958048E-48ED-4F68-98E7-316E1CA67EA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8958048E-48ED-4F68-98E7-316E1CA67EA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8958048E-48ED-4F68-98E7-316E1CA67EA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8958048E-48ED-4F68-98E7-316E1CA67EA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2002C924-BB8C-49AC-AC05-8D19EE8C9F1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2002C924-BB8C-49AC-AC05-8D19EE8C9F1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2002C924-BB8C-49AC-AC05-8D19EE8C9F1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2002C924-BB8C-49AC-AC05-8D19EE8C9F1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{30A5E350-3722-4DD3-A9EE-3085A1DA3DAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30A5E350-3722-4DD3-A9EE-3085A1DA3DAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30A5E350-3722-4DD3-A9EE-3085A1DA3DAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30A5E350-3722-4DD3-A9EE-3085A1DA3DAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{11295156-EF37-43D4-9572-A0C5839B13CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11295156-EF37-43D4-9572-A0C5839B13CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11295156-EF37-43D4-9572-A0C5839B13CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11295156-EF37-43D4-9572-A0C5839B13CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32E640C0-86A9-4772-85A0-8438D775E9A0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

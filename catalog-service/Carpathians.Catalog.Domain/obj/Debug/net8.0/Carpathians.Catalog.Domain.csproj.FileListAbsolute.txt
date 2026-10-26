@@ -1,0 +1,12 @@
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\bin\Debug\net8.0\Carpathians.Catalog.Domain.deps.json
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\bin\Debug\net8.0\Carpathians.Catalog.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\bin\Debug\net8.0\Carpathians.Catalog.Domain.pdb
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.AssemblyInfoInputs.cache
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.AssemblyInfo.cs
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.csproj.CoreCompileInputs.cache
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.sourcelink.json
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\refint\Carpathians.Catalog.Domain.dll
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\Carpathians.Catalog.Domain.pdb
+D:\CarpathiansApp\CarpathiansApp\catalog-service\Carpathians.Catalog.Domain\obj\Debug\net8.0\ref\Carpathians.Catalog.Domain.dll
