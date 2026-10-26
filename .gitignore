@@ -1,0 +1,21 @@
+## [Visual Studio / Rider / VS Code]
+.idea/
+.vscode/
+*.DotSettings.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## [Build results]
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## [.NET Aspire]
+.aspire/
+
+## [OS generated]
+.DS_Store
+Thumbs.db

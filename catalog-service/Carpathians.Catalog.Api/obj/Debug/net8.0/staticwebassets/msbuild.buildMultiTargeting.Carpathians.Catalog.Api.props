@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\Carpathians.Catalog.Api.props" />
-</Project>
