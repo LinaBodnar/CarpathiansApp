@@ -11,3 +11,8 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
