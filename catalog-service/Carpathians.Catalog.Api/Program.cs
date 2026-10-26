@@ -1,3 +1,4 @@
+using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
 using Carpathians.Bll.Services;
@@ -32,7 +33,7 @@ builder.Services.AddScoped<IRoutePointRepository, RoutePointRepository>();
 builder.Services.AddScoped<IRegionRepository, RegionRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// AutoMapper (with LicenseKey as in Orders / Booking)
+// AutoMapper
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"];
@@ -44,9 +45,27 @@ builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<IPointService, PointService>();
 builder.Services.AddScoped<IRegionService, RegionService>();
 
+// ProblemDetails & Exception Handler
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
+    ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+
+// Controllers & Swagger
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.MapControllers();
 app.Run();
