@@ -1,7 +1,12 @@
 using System.Reflection;
 using Carpathians.Reviews.Application;
+using Carpathians.Reviews.Application.Common.Interfaces;
+using Carpathians.Reviews.Domain.Interfaces;
 using Carpathians.Reviews.Infrastructure;
 using Carpathians.Reviews.Infrastructure.HealthChecks;
+using Carpathians.Reviews.Infrastructure.Persistence.Queries;
+using Carpathians.Reviews.Infrastructure.Persistence.Repositories;
+using Carpathians.Reviews.WebApi.Caching;
 using Carpathians.Reviews.WebApi.Mappings;
 using Carpathians.Reviews.WebApi.Middleware;
 using MongoDB.Driver;
@@ -27,6 +32,30 @@ if (builder.Configuration.GetConnectionString("ReviewsDb") is { Length: > 0 } as
 builder.Services
     .AddApplication(builder.Configuration, typeof(ApiMappingProfile).Assembly)  // MediatR, Behaviors, валідатори, AutoMapper
     .AddInfrastructure(builder.Configuration);                                  // MongoDB: мапінг, контекст, репозиторії, запити
+
+// Кеш (Лаб. 06)
+// L2: IDistributedCache поверх Redis (ConnectionStrings:redis від AppHost, Aspire-інтеграція).
+// Власний health check Redis вимкнено: недоступний кеш — це Degraded (CacheHealthCheck), а не відмова сервісу.
+if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("redis")))
+{
+    builder.AddRedisDistributedCache("redis",
+        settings => settings.DisableHealthChecks = true,
+        options =>
+        {
+            options.AbortOnConnectFail = false; // старт сервісу не залежить від Redis
+            options.ConnectTimeout = 2000;
+            options.AsyncTimeout = 1000;        // недоступний Redis не затримує запит надовго
+        });
+}
+// L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> MongoDB), метрики, health check
+builder.AddPlatformCaching();
+
+// Декоратори з кешем поверх реалізацій Infrastructure (пізніша реєстрація інтерфейсу перекриває попередню):
+// читання (IReviewQueries) кешується, запис (IReviewRepository) інвалідує кеш маршруту.
+builder.Services.AddScoped<ReviewQueries>();
+builder.Services.AddScoped<ReviewRepository>();
+builder.Services.AddScoped<IReviewQueries, CachedReviewQueries>();
+builder.Services.AddScoped<IReviewRepository, CachedReviewRepository>();
 
 // Централізована обробка помилок: винятки -> ProblemDetails з коректним статусом
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>

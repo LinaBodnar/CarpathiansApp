@@ -1,7 +1,10 @@
 using Carpathians.Platform.ServiceDefaults.Caching;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -11,9 +14,11 @@ public static class CachingExtensions
     private const long DefaultMemorySizeLimitKb = 50 * 1024;
 
     /// <summary>
-    /// Кеш платформи: IMemoryCache з обмеженням розміру й політиками витіснення,
-    /// <see cref="ICacheService"/> (cache-aside), метрики й health check кешу.
-    /// <para>Ліміт: Caching:Memory:SizeLimitKb в appsettings.json.</para>
+    /// Кеш платформи: IMemoryCache (L1) з обмеженням розміру й політиками витіснення,
+    /// <see cref="ICacheService"/> (cache-aside L1 -> L2 -> база), запобіжник для Redis, метрики й health check.
+    /// <para>Рівень L2 — IDistributedCache, зареєстрований сервісом до виклику
+    /// (<c>builder.AddRedisDistributedCache("redis")</c>). Без нього кеш працює лише в пам'яті.</para>
+    /// <para>Ліміт пам'яті: Caching:Memory:SizeLimitKb в appsettings.json.</para>
     /// </summary>
     public static TBuilder AddPlatformCaching<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
@@ -28,8 +33,14 @@ public static class CachingExtensions
             options.TrackStatistics = true;                           // статистика для метрик і health check
         });
 
+        builder.Services.TryAddSingleton<DistributedCacheCircuit>();
         builder.Services.TryAddSingleton<CacheMetrics>();
-        builder.Services.TryAddSingleton<ICacheService, CacheService>();
+        builder.Services.TryAddSingleton<ICacheService>(sp => new CacheService(
+            sp.GetRequiredService<IMemoryCache>(),
+            sp.GetRequiredService<CacheMetrics>(),
+            sp.GetRequiredService<DistributedCacheCircuit>(),
+            sp.GetRequiredService<ILogger<CacheService>>(),
+            sp.GetService<IDistributedCache>()));                     // Redis (L2), якщо підключено
 
         builder.Services.AddHealthChecks()
             .AddCheck<CacheHealthCheck>("cache", tags: new[] { "cache" });

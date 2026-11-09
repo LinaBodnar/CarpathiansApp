@@ -1,3 +1,4 @@
+using Carpathians.Api.Caching;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
@@ -15,9 +16,31 @@ var connectionString = builder.Configuration.GetConnectionString("BookingDb")
                        ?? throw new InvalidOperationException("Connection string 'BookingDb' is missing");
 
 builder.Services.AddScoped<IUnitOfWork>(_ => new UnitOfWork(connectionString));
-builder.Services.AddScoped<ICustomerService, CustomerService>();
-builder.Services.AddScoped<IDepartureService, DepartureService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
+
+// Кеш (Лаб. 06)
+// L2: IDistributedCache поверх Redis (ConnectionStrings:redis від AppHost, Aspire-інтеграція).
+// Власний health check Redis вимкнено: недоступний кеш — це Degraded (CacheHealthCheck), а не відмова сервісу.
+if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("redis")))
+{
+    builder.AddRedisDistributedCache("redis",
+        settings => settings.DisableHealthChecks = true,
+        options =>
+        {
+            options.AbortOnConnectFail = false; // старт сервісу не залежить від Redis
+            options.ConnectTimeout = 2000;
+            options.AsyncTimeout = 1000;        // недоступний Redis не затримує запит надовго
+        });
+}
+// L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
+builder.AddPlatformCaching();
+
+// BLL-сервіси Лаб. 02 + декоратори з кешуванням (контролери й gRPC отримують I*Service з кешем)
+builder.Services.AddScoped<CustomerService>();
+builder.Services.AddScoped<DepartureService>();
+builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<ICustomerService, CachedCustomerService>();
+builder.Services.AddScoped<IDepartureService, CachedDepartureService>();
+builder.Services.AddScoped<IBookingService, CachedBookingService>();
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"];

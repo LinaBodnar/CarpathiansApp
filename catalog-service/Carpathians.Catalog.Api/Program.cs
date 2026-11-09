@@ -45,8 +45,27 @@ builder.Services.AddAutoMapper(cfg =>
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<CreateRouteDtoValidator>();
 
-// Кеш (Лаб. 06): IMemoryCache з SizeLimit і політиками витіснення, ICacheService, метрики, health check
+// Кеш (Лаб. 06)
+// L2: IDistributedCache поверх Redis. Рядок підключення ConnectionStrings:redis передає AppHost;
+// Aspire-інтеграція додає повторні підключення, логування й трасування Redis.
+// Власний health check Redis вимкнено: недоступний кеш — це Degraded (див. CacheHealthCheck), а не відмова сервісу.
+// Без AppHost (немає рядка підключення) сервіс працює лише з кешем у пам'яті.
+if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("redis")))
+{
+    builder.AddRedisDistributedCache("redis",
+        settings => settings.DisableHealthChecks = true,
+        options =>
+        {
+            options.AbortOnConnectFail = false; // старт сервісу не залежить від Redis
+            options.ConnectTimeout = 2000;
+            options.AsyncTimeout = 1000;        // недоступний Redis не затримує запит надовго
+        });
+}
+
+// L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
 builder.AddPlatformCaching();
+// Прогрівання кешу: регіони й популярні маршрути — під час старту й періодично
+builder.Services.AddHostedService<CatalogCacheWarmupService>();
 
 // BLL Services (Лаб. 03) + декоратори з кешуванням: контролери отримують I*Service з кешем,
 // а самі RouteService/RegionService/PointService лишаються без змін.
