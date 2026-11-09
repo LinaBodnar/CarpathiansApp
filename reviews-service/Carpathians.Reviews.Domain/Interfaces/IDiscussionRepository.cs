@@ -17,4 +17,7 @@ public interface IDiscussionRepository
     /// (messageCount, lastMessages) з перевіркою версії.
     /// </summary>
     Task AddMessageAsync(Discussion discussion, DiscussionMessage message, CancellationToken ct = default);
+
+    /// <summary>Оновлення денормалізованої назви маршруту в усіх обговореннях (подія з Каталогу).</summary>
+    Task<long> UpdateRouteNameAsync(long routeId, string routeName, CancellationToken ct = default);
 }
