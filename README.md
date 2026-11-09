@@ -30,6 +30,7 @@ carpathians-databases/
 ├── catalog-db/
 │   ├── schema.sql
 │   └── seed.sql
+├── reviews-service/            # Проєкт №3 — сервіс відгуків (Clean Architecture + CQRS + MongoDB)
 ├── reviews-db/
 │   ├── init.js                 # колекції, JSON Schema, індекси
 │   ├── seed.js                 # тестові дані (ідемпотентний)
@@ -336,3 +337,31 @@ docker run -p 8080:8080 -e ConnectionStrings__CatalogDb="Server=host.docker.inte
   }
   ```
   Для локальної розробки без ліцензійного ключа бібліотека виводить попередження в консоль, дозволяючи повноцінне виконання мапінгів.
+
+## Проєкт №3 — Reviews (Clean Architecture + CQRS + MongoDB)
+
+Сервіс відгуків, коментарів і обговорень маршрутів на базі `ReviewContext` (MongoDB). Побудований за
+**Clean Architecture** з чотирма шарами (Domain, Application, Infrastructure, WebApi), принципом **CQRS**
+і патерном **Mediator** (MediatR) на **.NET 8**. Повний опис — [`reviews-service/README.md`](reviews-service/README.md).
+
+### Коротко
+
+- **Domain** не залежить від жодного шару: сутності `Review`, `Discussion`, `DiscussionMessage` з інкапсуляцією
+  та доменними винятками; Value Objects `Author`, `GeoPoint`, `WeatherInfo`, `MessagePreview`.
+- **Application**: кожна операція — команда або запит MediatR; Pipeline Behaviors (логування, винятки,
+  FluentValidation, продуктивність); читання — через `IReviewQueries` / `IDiscussionQueries`.
+- **Infrastructure**: `BsonClassMap` без атрибутів у домені, структура документів як у Лаб. 01;
+  оптимістична конкурентність за полем `version`; проєкції й aggregation pipeline; автоматичні індекси
+  та ідемпотентний сідінг.
+- **WebApi**: тонкі контролери через `ISender`, `ETag` / `If-Match`, ProblemDetails з MongoDB-винятками
+  (DuplicateKey → 409, недоступна БД → 503), Serilog, Swagger, `/health`.
+
+### Запуск
+
+```bash
+docker run -d --name mongo-carpathians -p 27017:27017 mongo:7
+cd reviews-service/Carpathians.Reviews.WebApi
+dotnet run
+```
+
+Swagger UI: `http://localhost:5203/swagger`. Індекси та початкові дані створюються автоматично під час старту.
