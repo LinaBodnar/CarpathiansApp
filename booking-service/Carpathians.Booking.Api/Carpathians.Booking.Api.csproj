@@ -12,6 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\platform\Carpathians.Platform.ServiceDefaults\Carpathians.Platform.ServiceDefaults.csproj" />
       <ProjectReference Include="..\Carpathians.Booking.Bll\Carpathians.Booking.Bll.csproj" />
       <ProjectReference Include="..\Carpathians.Booking.Dal\Carpathians.Booking.Dal.csproj" />
       <ProjectReference Include="..\Carpathians.Booking.Domain\Carpathians.Booking.Domain.csproj" />

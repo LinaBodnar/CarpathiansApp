@@ -1,0 +1,27 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.1">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <!-- пароль SQL Server зберігається в user-secrets, а не в коді -->
+    <UserSecretsId>5d3c9f2e-7b41-4c8a-9e6d-2f1a8b7c4e90</UserSecretsId>
+  </PropertyGroup>
+
+  <!-- AppHost посилається на всі компоненти платформи; самі сервіси про AppHost не знають -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\booking-service\Carpathians.Booking.Api\Carpathians.Booking.Api.csproj" />
+    <ProjectReference Include="..\..\catalog-service\Carpathians.Catalog.Api\Carpathians.Catalog.Api.csproj" />
+    <ProjectReference Include="..\..\reviews-service\Carpathians.Reviews.WebApi\Carpathians.Reviews.WebApi.csproj" />
+    <ProjectReference Include="..\Carpathians.Platform.ApiGateway\Carpathians.Platform.ApiGateway.csproj" />
+    <ProjectReference Include="..\Carpathians.Platform.Aggregator\Carpathians.Platform.Aggregator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.1" />
+    <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.6.1" />
+  </ItemGroup>
+
+</Project>
