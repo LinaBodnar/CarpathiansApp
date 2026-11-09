@@ -15,7 +15,8 @@ public class Discussion : BaseEntity
     public const int MaxTitleLength = 200;
     public const int LastMessagesLimit = 3;
 
-    private readonly List<MessagePreview> _lastMessages = new();
+    // поля не readonly: драйвер MongoDB заповнює їх під час десеріалізації (BsonClassMap.MapField)
+    private List<MessagePreview> _lastMessages = new();
 
     public long RouteId { get; private set; }
     public string RouteName { get; private set; } = string.Empty;

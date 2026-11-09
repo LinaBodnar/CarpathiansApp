@@ -24,10 +24,11 @@ public class Review : BaseEntity
     public const int MaxTags = 10;
     public const int MaxGpsPoints = 5000;
 
-    private readonly List<Comment> _comments = new();
-    private readonly List<string> _photos = new();
-    private readonly List<string> _tags = new();
-    private readonly List<GeoPoint> _gpsTrack = new();
+    // поля не readonly: драйвер MongoDB заповнює їх під час десеріалізації (BsonClassMap.MapField)
+    private List<Comment> _comments = new();
+    private List<string> _photos = new();
+    private List<string> _tags = new();
+    private List<GeoPoint> _gpsTrack = new();
 
     public long RouteId { get; private set; }
     public string RouteName { get; private set; } = string.Empty;

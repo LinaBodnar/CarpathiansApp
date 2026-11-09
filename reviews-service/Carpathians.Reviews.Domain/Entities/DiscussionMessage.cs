@@ -15,7 +15,8 @@ public class DiscussionMessage : BaseEntity
     public const int MaxTextLength = 5000;
     public const int MaxAttachments = 10;
 
-    private readonly List<string> _attachments = new();
+    // поля не readonly: драйвер MongoDB заповнює їх під час десеріалізації (BsonClassMap.MapField)
+    private List<string> _attachments = new();
 
     public ObjectId DiscussionId { get; private set; }
     public Author Author { get; private set; } = null!;
