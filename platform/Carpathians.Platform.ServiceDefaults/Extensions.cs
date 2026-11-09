@@ -1,6 +1,9 @@
+using System.Text.Json;
+using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Platform.ServiceDefaults.Correlation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -26,6 +29,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string CacheHealthEndpointPath = "/health/cache";
 
     /// <summary>ActivitySource драйвера MongoDB (пакет MongoDB.Driver.Core.Extensions.DiagnosticSources).</summary>
     public const string MongoDbActivitySource = "MongoDB.Driver.Core.Extensions.DiagnosticSources";
@@ -111,7 +115,8 @@ public static class Extensions
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
-                .AddMeter("Carpathians.*"))                         // власні метрики (Gateway)
+                .AddMeter(CacheMetrics.MeterName)                     // кеш: cache.hits, cache.misses, ... (Лаб. 06)
+                .AddMeter("Carpathians.*"))                         // інші власні метрики (Gateway)
             .WithTracing(tracing => tracing
                 .SetSampler(CreateSampler(builder))
                 .AddSource(builder.Environment.ApplicationName)       // власні spans сервісу (Activity API)
@@ -172,6 +177,29 @@ public static class Extensions
             Predicate = r => r.Tags.Contains("live")
         });
 
+        // /health/cache — статистика кешу (Лаб. 06) у JSON: записи, розмір, попадання/промахи
+        app.MapHealthChecks(CacheHealthEndpointPath, new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("cache"),
+            ResponseWriter = WriteHealthDetailsAsync
+        });
+
         return app;
+    }
+
+    private static Task WriteHealthDetailsAsync(HttpContext context, HealthReport report)
+    {
+        context.Response.ContentType = "application/json; charset=utf-8";
+        var body = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.ToDictionary(e => e.Key, e => new
+            {
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                data = e.Value.Data
+            })
+        };
+        return context.Response.WriteAsync(JsonSerializer.Serialize(body, new JsonSerializerOptions { WriteIndented = true }));
     }
 }

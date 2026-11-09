@@ -1,4 +1,5 @@
 using Carpathians.Api.Filters;
+using Carpathians.Catalog.Api.Caching;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
@@ -44,10 +45,17 @@ builder.Services.AddAutoMapper(cfg =>
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<CreateRouteDtoValidator>();
 
-// BLL Services
-builder.Services.AddScoped<IRouteService, RouteService>();
-builder.Services.AddScoped<IPointService, PointService>();
-builder.Services.AddScoped<IRegionService, RegionService>();
+// Кеш (Лаб. 06): IMemoryCache з SizeLimit і політиками витіснення, ICacheService, метрики, health check
+builder.AddPlatformCaching();
+
+// BLL Services (Лаб. 03) + декоратори з кешуванням: контролери отримують I*Service з кешем,
+// а самі RouteService/RegionService/PointService лишаються без змін.
+builder.Services.AddScoped<RouteService>();
+builder.Services.AddScoped<PointService>();
+builder.Services.AddScoped<RegionService>();
+builder.Services.AddScoped<IRouteService, CachedRouteService>();
+builder.Services.AddScoped<IPointService, CachedPointService>();
+builder.Services.AddScoped<IRegionService, CachedRegionService>();
 
 // ProblemDetails & Exception Handler
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
