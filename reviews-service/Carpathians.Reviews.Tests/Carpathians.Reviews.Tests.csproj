@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Carpathians.Reviews.Application\Carpathians.Reviews.Application.csproj" />
     <ProjectReference Include="..\Carpathians.Reviews.Domain\Carpathians.Reviews.Domain.csproj" />
     <ProjectReference Include="..\Carpathians.Reviews.Infrastructure\Carpathians.Reviews.Infrastructure.csproj" />
+    <ProjectReference Include="..\Carpathians.Reviews.WebApi\Carpathians.Reviews.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

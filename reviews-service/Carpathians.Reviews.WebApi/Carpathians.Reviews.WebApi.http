@@ -1,0 +1,56 @@
+@host = http://localhost:5203
+
+### Список відгуків маршруту 1, найновіші першими
+GET {{host}}/api/reviews?routeId=1&sortBy=createdAt&sortDir=desc&page=1&pageSize=5
+
+### Курсорна пагінація
+GET {{host}}/api/reviews/feed?limit=2
+
+### Відгук за Id (ETag у відповіді)
+GET {{host}}/api/reviews/66f0c2000000000000000001
+
+### Створення відгуку -> 201 + Location
+POST {{host}}/api/reviews
+Content-Type: application/json
+
+{
+  "routeId": 3,
+  "routeName": "Заросляк – Говерла – Петрос",
+  "authorId": "7",
+  "authorName": "Ірина",
+  "rating": 5,
+  "text": "Довгий, але дуже красивий маршрут",
+  "tags": ["ridge", "sunrise"],
+  "weather": { "tempC": 14, "wind": "light", "conditions": "sunny" }
+}
+
+### Rating = 10 -> 400 від ValidationBehavior (обробник не викликається)
+POST {{host}}/api/reviews
+Content-Type: application/json
+
+{
+  "routeId": 1, "routeName": "Заросляк – Говерла",
+  "authorId": "99", "authorName": "Тест", "rating": 10, "text": "Невалідна оцінка"
+}
+
+### Оновлення з If-Match (застаріла версія -> 409)
+PUT {{host}}/api/reviews/66f0c2000000000000000002
+Content-Type: application/json
+If-Match: "0"
+
+{ "rating": 3, "text": "Оновлений відгук", "tags": ["windy"] }
+
+### Рейтинг маршруту
+GET {{host}}/api/routes/1/rating
+
+### Обговорення маршруту
+GET {{host}}/api/routes/1/discussions
+
+### Повідомлення обговорення
+GET {{host}}/api/discussions/66f0c3000000000000000001/messages
+
+### Невалідний ObjectId -> 400
+GET {{host}}/api/reviews/not-an-id
+
+### Health check
+GET {{host}}/health

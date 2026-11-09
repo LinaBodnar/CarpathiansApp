@@ -1,4 +1,5 @@
 using Carpathians.Reviews.Application.Common.Behaviors;
+using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,8 +12,9 @@ public static class DependencyInjection
     /// Реєстрація шару Application: MediatR (команди, запити, обробники, Pipeline Behaviors),
     /// валідатори FluentValidation та AutoMapper.
     /// </summary>
+    /// <param name="mappingAssemblies">Додаткові збірки з профілями AutoMapper (наприклад, WebApi).</param>
     public static IServiceCollection AddApplication(
-        this IServiceCollection services, IConfiguration config)
+        this IServiceCollection services, IConfiguration config, params Assembly[] mappingAssemblies)
     {
         var assembly = typeof(DependencyInjection).Assembly;
         var licenseKey = config["LuckyPenny:LicenseKey"];
@@ -34,7 +36,7 @@ public static class DependencyInjection
         services.AddAutoMapper(cfg =>
         {
             cfg.LicenseKey = licenseKey;
-            cfg.AddMaps(assembly);
+            cfg.AddMaps(new[] { assembly }.Concat(mappingAssemblies).Distinct());
         });
 
         return services;
