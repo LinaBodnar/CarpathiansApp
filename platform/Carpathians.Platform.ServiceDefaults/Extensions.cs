@@ -110,7 +110,8 @@ public static class Extensions
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation())
+                .AddRuntimeInstrumentation()
+                .AddMeter("Carpathians.*"))                         // власні метрики (Gateway)
             .WithTracing(tracing => tracing
                 .SetSampler(CreateSampler(builder))
                 .AddSource(builder.Environment.ApplicationName)       // власні spans сервісу (Activity API)

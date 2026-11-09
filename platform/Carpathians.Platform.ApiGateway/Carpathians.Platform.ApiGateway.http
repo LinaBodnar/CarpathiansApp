@@ -1,0 +1,23 @@
+@gateway = http://localhost:5000
+
+### Бронювання (booking-api)
+GET {{gateway}}/api/bookings/1
+
+### Виїзди (booking-api)
+GET {{gateway}}/api/departures
+
+### Маршрути (catalog-api)
+GET {{gateway}}/api/routes?page=1&pageSize=5
+
+### Рейтинг маршруту — специфічніший маршрут з вищим пріоритетом (reviews-api)
+GET {{gateway}}/api/routes/1/rating
+
+### Відгуки (reviews-api)
+GET {{gateway}}/api/reviews?routeId=1
+
+### Власний CorrelationId зберігається і передається сервісу
+GET {{gateway}}/api/reviews?routeId=1
+X-Correlation-Id: demo-correlation-0001
+
+### Агрегована картка бронювання (aggregator)
+GET {{gateway}}/api/aggregator/bookings/1/full
