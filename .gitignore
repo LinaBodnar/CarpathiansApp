@@ -482,3 +482,10 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+## [.NET Aspire]
+.aspire/
+
+## [Secrets & Local configs]
+*.local.json
+appsettings.*.local.json
