@@ -1,10 +1,12 @@
 using Carpathians.Api.Caching;
+using Carpathians.Api.Grpc;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
 using Carpathians.Bll.Services;
 using Carpathians.Dal.Interfaces;
 using Carpathians.Dal.Repositories;
+using Carpathians.Platform.ServiceDefaults.Grpc;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,6 +49,16 @@ builder.Services.AddAutoMapper(cfg =>
     cfg.AddProfile<BookingProfile>();
 });
 
+// gRPC-сервер (Лаб. 06): HTTP/2 через HTTPS-endpoint (Http1AndHttp2, ALPN), interceptor-и:
+// логування/трасування викликів і перетворення доменних винятків на коди статусу gRPC.
+builder.Services.AddGrpc(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    options.Interceptors.Add<GrpcServerLoggingInterceptor>();
+    options.Interceptors.Add<BookingGrpcExceptionInterceptor>();
+});
+builder.Services.AddGrpcReflection();
+
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
@@ -68,5 +80,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGrpcService<BookingGrpcService>();          // gRPC: carpathians.booking.v1.BookingGrpc
+if (app.Environment.IsDevelopment())
+    app.MapGrpcReflectionService();               // опис сервісів для Postman/grpcurl
 app.MapDefaultEndpoints();
 app.Run();

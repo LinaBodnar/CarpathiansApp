@@ -2,8 +2,8 @@ namespace Carpathians.Platform.ServiceDefaults.Caching;
 
 /// <summary>
 /// Контекст поточного виклику для кешу (AsyncLocal — свій для кожного запиту):
-/// через який протокол прийшов запит і на якому рівні його обслужив кеш.
-/// gRPC-interceptor позначає виклик як "grpc" і після відповіді читає <see cref="LastResult"/>,
+/// через який протокол прийшов запит і на яких рівнях кеш його обслужив.
+/// gRPC-interceptor позначає виклик як "grpc" і після відповіді читає <see cref="Summary"/>,
 /// щоб передати ознаку попадання клієнту в trailers і залогувати її окремо від HTTP.
 /// </summary>
 public static class CacheCallContext
@@ -17,8 +17,11 @@ public static class CacheCallContext
     /// <summary>Протокол поточного запиту (за замовчуванням http).</summary>
     public static string Transport => Current.Value?.Transport ?? Http;
 
-    /// <summary>Результат останнього звернення до кешу в межах виклику: l1, l2 або source.</summary>
-    public static string? LastResult => Current.Value?.LastResult;
+    /// <summary>
+    /// Де були знайдені дані в межах виклику: "l1", "l2", "source" або кілька з кількістю
+    /// ("l1=2,source=1" — для пакетних методів). null — кеш не використовувався.
+    /// </summary>
+    public static string? Summary => Current.Value?.Summary();
 
     /// <summary>Почати контекст виклику (gRPC-interceptor, фонове прогрівання).</summary>
     public static IDisposable Begin(string transport)
@@ -28,16 +31,32 @@ public static class CacheCallContext
         return new Restore(previous);
     }
 
-    internal static void Record(string level)
-    {
-        if (Current.Value is { } scope)
-            scope.LastResult = level;
-    }
+    internal static void Record(string level) => Current.Value?.Record(level);
 
     private sealed class Scope(string transport)
     {
+        private readonly Dictionary<string, int> _results = new(StringComparer.Ordinal);
+
         public string Transport { get; } = transport;
-        public string? LastResult { get; set; }
+
+        public void Record(string level)
+        {
+            lock (_results)
+                _results[level] = _results.GetValueOrDefault(level) + 1;
+        }
+
+        public string? Summary()
+        {
+            lock (_results)
+            {
+                return _results.Count switch
+                {
+                    0 => null,
+                    1 when _results.Values.Single() == 1 => _results.Keys.Single(),
+                    _ => string.Join(',', _results.OrderBy(r => r.Key).Select(r => $"{r.Key}={r.Value}"))
+                };
+            }
+        }
     }
 
     private sealed class Restore(Scope? previous) : IDisposable

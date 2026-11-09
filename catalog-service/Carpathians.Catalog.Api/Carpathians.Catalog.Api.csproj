@@ -22,6 +22,8 @@
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
     <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="9.5.2" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
+    <!-- gRPC reflection: виклики з Postman/grpcurl без .proto (лише Development) -->
+    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.76.0" />
   </ItemGroup>
 
   <!-- gRPC-контракт Каталогу (серверна частина) + спільні типи платформи (DecimalValue) -->

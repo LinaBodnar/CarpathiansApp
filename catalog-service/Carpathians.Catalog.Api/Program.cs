@@ -1,5 +1,7 @@
 using Carpathians.Api.Filters;
 using Carpathians.Catalog.Api.Caching;
+using Carpathians.Catalog.Api.Grpc;
+using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
@@ -81,6 +83,16 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
+// gRPC-сервер (Лаб. 06): HTTP/2 через HTTPS-endpoint (Http1AndHttp2, ALPN), interceptor-и:
+// логування/трасування викликів і перетворення доменних винятків на коди статусу gRPC.
+builder.Services.AddGrpc(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    options.Interceptors.Add<GrpcServerLoggingInterceptor>();
+    options.Interceptors.Add<CatalogGrpcExceptionInterceptor>();
+});
+builder.Services.AddGrpcReflection();
+
 // Controllers & Swagger
 builder.Services.AddControllers(o =>
 {
@@ -131,5 +143,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGrpcService<CatalogGrpcService>();          // gRPC: carpathians.catalog.v1.CatalogGrpc
+if (app.Environment.IsDevelopment())
+    app.MapGrpcReflectionService();               // опис сервісів для Postman/grpcurl
 app.MapDefaultEndpoints();
 app.Run();

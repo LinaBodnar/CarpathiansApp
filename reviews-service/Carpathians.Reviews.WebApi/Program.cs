@@ -6,7 +6,9 @@ using Carpathians.Reviews.Infrastructure;
 using Carpathians.Reviews.Infrastructure.HealthChecks;
 using Carpathians.Reviews.Infrastructure.Persistence.Queries;
 using Carpathians.Reviews.Infrastructure.Persistence.Repositories;
+using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Reviews.WebApi.Caching;
+using Carpathians.Reviews.WebApi.Grpc;
 using Carpathians.Reviews.WebApi.Mappings;
 using Carpathians.Reviews.WebApi.Middleware;
 using MongoDB.Driver;
@@ -69,6 +71,16 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddHealthChecks()
     .AddCheck<MongoDbHealthCheck>("mongodb", tags: new[] { "db", "ready" });
 
+// gRPC-сервер (Лаб. 06): HTTP/2 через HTTPS-endpoint (Http1AndHttp2, ALPN), interceptor-и:
+// логування/трасування викликів і перетворення доменних винятків на коди статусу gRPC.
+builder.Services.AddGrpc(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    options.Interceptors.Add<GrpcServerLoggingInterceptor>();
+    options.Interceptors.Add<ReviewsGrpcExceptionInterceptor>();
+});
+builder.Services.AddGrpcReflection();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o =>
@@ -92,6 +104,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGrpcService<ReviewsGrpcService>();          // gRPC: carpathians.reviews.v1.ReviewsGrpc
+if (app.Environment.IsDevelopment())
+    app.MapGrpcReflectionService();               // опис сервісів для Postman/grpcurl
 app.MapDefaultEndpoints();                          // /health (у т. ч. MongoDB) і /alive
 
 app.Run();

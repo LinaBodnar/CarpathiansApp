@@ -27,6 +27,8 @@
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <!-- gRPC: спільні серверні interceptor-и (логування, трасування, перетворення винятків) -->
+    <PackageReference Include="Grpc.Core.Api" Version="2.76.0" />
   </ItemGroup>
 
 </Project>
