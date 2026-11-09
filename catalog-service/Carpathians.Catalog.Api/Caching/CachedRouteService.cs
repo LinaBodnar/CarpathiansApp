@@ -115,7 +115,11 @@ public sealed class CachedRouteService(RouteService inner, ICacheService cache) 
     private Task<string> ListsVersionAsync(CancellationToken ct)
         => cache.GetVersionAsync(CatalogCacheKeys.RoutesVersion, CatalogCachePolicies.ListVersion, ct);
 
-    /// <summary>Картка маршруту + усі списки (маршрут може входити в будь-яку сторінку).</summary>
+    /// <summary>
+    /// Картка маршруту + усі списки (маршрут може входити в будь-яку сторінку)
+    /// + агрегований огляд маршруту в Aggregator (спільний Redis).
+    /// </summary>
     private Task InvalidateRouteAsync(long id, string reason, CancellationToken ct)
-        => cache.InvalidateAsync(reason, ct, CatalogCacheKeys.Route(id), CatalogCacheKeys.RoutesVersion);
+        => cache.InvalidateAsync(reason, ct,
+            CatalogCacheKeys.Route(id), CatalogCacheKeys.RoutesVersion, AggregatorCacheKeys.RouteOverview(id));
 }

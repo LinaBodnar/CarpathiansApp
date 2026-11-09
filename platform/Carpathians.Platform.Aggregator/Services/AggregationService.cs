@@ -1,86 +1,128 @@
 using System.Diagnostics;
-using System.Text.Json;
-using Carpathians.Platform.Aggregator.Clients;
-using Carpathians.Platform.Aggregator.Contracts;
+using Carpathians.Booking.Grpc;
+using Carpathians.Catalog.Grpc;
+using Carpathians.Grpc.Common;
+using Carpathians.Platform.Aggregator.Caching;
 using Carpathians.Platform.Aggregator.Models;
-using Polly;
+using Carpathians.Platform.ServiceDefaults.Caching;
+using Carpathians.Reviews.Grpc;
+using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 
 namespace Carpathians.Platform.Aggregator.Services;
 
 /// <summary>
-/// Aggregator Pattern: паралельно опитує мікросервіси (Task.WhenAll) і збирає одну відповідь.
-/// Недоступність необов'язкового сервісу не «валить» запит — дані цього сервісу відсутні,
-/// а в Warnings з'являється попередження.
+/// Aggregator Pattern поверх gRPC (Лаб. 06): типізовані gRPC-клієнти мікросервісів,
+/// незалежні виклики — паралельно (Task.WhenAll), мультиплексовані в одному HTTP/2-з'єднанні з кожним сервісом.
+/// <list type="bullet">
+/// <item>кеш агрегованих відповідей у Redis перевіряється ДО паралельних викликів; повні відповіді кешуються на 30 с;</item>
+/// <item>часткові відмови: недоступний необов'язковий сервіс (RpcException UNAVAILABLE, DEADLINE_EXCEEDED...)
+/// дає попередження у Warnings, а не помилку всього запиту; NOT_FOUND — це «даних немає», не відмова;</item>
+/// <item>CancellationToken і deadline передаються в кожен виклик.</item>
+/// </list>
+/// Відповіді gRPC перетворюються на ті самі агреговані DTO, що й у Лаб. 05 (HTTP) — контракт для клієнтів не змінився.
 /// </summary>
 public class AggregationService(
-    BookingClient booking,
-    CatalogClient catalog,
-    ReviewsClient reviews,
+    BookingGrpc.BookingGrpcClient booking,
+    CatalogGrpc.CatalogGrpcClient catalog,
+    ReviewsGrpc.ReviewsGrpcClient reviews,
+    AggregatedResponseCache cache,
     ILogger<AggregationService> logger)
 {
     public const int LatestReviewsCount = 3;
 
-    /// <summary>Власні spans агрегації (видно в trace разом з паралельними викликами сервісів).</summary>
+    /// <summary>Deadline одного gRPC-виклику: повільний сервіс не затримує всю агрегацію.</summary>
+    public static readonly TimeSpan CallDeadline = TimeSpan.FromSeconds(5);
+
+    private const string BookingService = "booking-api";
+    private const string CatalogService = "catalog-api";
+    private const string ReviewsService = "reviews-api";
+
+    /// <summary>Власні spans агрегації (батьківські для spans gRPC-клієнтів).</summary>
     private static readonly ActivitySource Telemetry = new("Carpathians.Aggregator");
 
-    private static readonly string[] DifficultyNames = { "Easy", "Moderate", "Hard" };
+    // ---------- Повна картка бронювання ----------
 
-    /// <summary>Повна картка бронювання. null — бронювання не існує.</summary>
-    public async Task<FullBookingDto?> GetFullBookingAsync(long bookingId, CancellationToken ct)
+    /// <summary>Повна картка бронювання. Value = null — бронювання не існує; FromCache — відповідь з Redis.</summary>
+    public async Task<(FullBookingDto? Value, bool FromCache)> GetFullBookingAsync(long bookingId, CancellationToken ct)
+    {
+        var key = AggregatorCacheKeys.FullBooking(bookingId);
+        if (await cache.GetAsync<FullBookingDto>(key, ct) is { } cached)
+            return (cached, true);
+
+        var result = await AggregateFullBookingAsync(bookingId, ct);
+        await CacheIfCompleteAsync(key, result, result?.Warnings, ct);
+        return (result, false);
+    }
+
+    private async Task<FullBookingDto?> AggregateFullBookingAsync(long bookingId, CancellationToken ct)
     {
         using var activity = Telemetry.StartActivity("AggregateFullBooking");
         activity?.SetTag("booking.id", bookingId);
-        var warnings = new Warnings();
+        activity?.SetTag("aggregator.transport", "grpc");
+        var warnings = new AggregationWarnings();
 
-        // 1. Бронювання — без нього агрегувати нічого (обов'язковий виклик).
-        BookingResponse? bookingData;
+        // 1. Бронювання — обов'язкове: без нього агрегувати нічого.
+        BookingReply bookingData;
         try
         {
-            bookingData = await booking.GetBookingAsync(bookingId, ct);
+            bookingData = await booking.GetBookingAsync(new GetBookingRequest { Id = bookingId }, Options(ct));
         }
-        catch (Exception ex) when (IsUnavailable(ex, ct))
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
         {
-            logger.LogError(ex, "{Service} is unavailable, booking {BookingId} cannot be aggregated",
-                booking.ServiceName, bookingId);
-            throw new UpstreamUnavailableException(booking.ServiceName, ex);
+            return null;
+        }
+        catch (RpcException ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogError(ex, "{Service} is unavailable ({GrpcStatus}), booking {BookingId} cannot be aggregated",
+                BookingService, ex.StatusCode, bookingId);
+            throw new UpstreamUnavailableException(BookingService, ex);
         }
 
-        if (bookingData is null)
-            return null;
-
-        // 2. Клієнт і виїзди позицій бронювання (booking-api) — паралельно.
+        // 2. Клієнт і виїзди позицій (booking-api) — паралельно; виїзди — одним пакетним викликом.
         var departureIds = bookingData.Items.Select(i => i.DepartureId).Distinct().ToList();
-        var customerTask = SafeAsync(booking.ServiceName, $"customer {bookingData.CustomerId}",
-            () => booking.GetCustomerAsync(bookingData.CustomerId, ct), warnings, ct);
-        var departureTasks = departureIds.Select(id => SafeAsync(booking.ServiceName,
-            $"departure {id}", () => booking.GetDepartureAsync(id, ct), warnings, ct)).ToList();
+        var customerTask = SafeAsync(BookingService, $"customer {bookingData.CustomerId}",
+            token => booking.GetCustomerAsync(new GetCustomerRequest { Id = bookingData.CustomerId }, Options(token)).ResponseAsync,
+            warnings, ct);
+        var departuresTask = departureIds.Count == 0
+            ? Task.FromResult<DeparturesReply?>(new DeparturesReply())
+            : SafeAsync(BookingService, "departures",
+                token => booking.GetDeparturesByIdsAsync(new GetDeparturesByIdsRequest { Ids = { departureIds } }, Options(token)).ResponseAsync,
+                warnings, ct);
 
-        await Task.WhenAll(departureTasks.Cast<Task>().Append(customerTask));
-        var customer = await customerTask;                       // уже завершено — без блокування
+        await Task.WhenAll(customerTask, departuresTask);
+        var customer = await customerTask;                           // задачі вже завершені — await без очікування
+        var departures = (await departuresTask)?.Departures
+            .Where(d => departureIds.Contains(d.Id))                 // узгодженість: лише виїзди цього бронювання
+            .ToDictionary(d => d.Id) ?? new Dictionary<long, DepartureReply>();
 
-        // Узгодженість: беремо лише виїзди, які справді належать позиціям цього бронювання.
-        var departures = (await Task.WhenAll(departureTasks))
-            .Where(d => d is not null && departureIds.Contains(d.Id))
-            .ToDictionary(d => d!.Id, d => d!);
-
-        // 3. Маршрути з Каталогу + рейтинги й відгуки з Відгуків — усі виклики одночасно.
+        // 3. Маршрути (catalog-api), рейтинги й свіжі відгуки (reviews-api) — усі виклики одночасно.
         var routeIds = departures.Values.Select(d => d.RouteId).Distinct().ToList();
         activity?.SetTag("route.ids", string.Join(",", routeIds));
 
-        var routeTasks = routeIds.ToDictionary(id => id, id => SafeAsync(catalog.ServiceName,
-            $"route {id}", () => catalog.GetRouteAsync(id, ct), warnings, ct));
-        var ratingTasks = routeIds.ToDictionary(id => id, id => SafeAsync(reviews.ServiceName,
-            $"rating of route {id}", () => reviews.GetRouteRatingAsync(id, ct), warnings, ct));
-        var reviewTasks = routeIds.ToDictionary(id => id, id => SafeAsync(reviews.ServiceName,
-            $"reviews of route {id}", () => reviews.GetLatestReviewsAsync(id, LatestReviewsCount, ct), warnings, ct));
+        var routesTask = routeIds.Count == 0
+            ? Task.FromResult<RoutesReply?>(new RoutesReply())
+            : SafeAsync(CatalogService, "routes",
+                token => catalog.GetRoutesByIdsAsync(new GetRoutesByIdsRequest { Ids = { routeIds } }, Options(token)).ResponseAsync,
+                warnings, ct);
+        var ratingsTask = routeIds.Count == 0
+            ? Task.FromResult<RouteRatingsReply?>(new RouteRatingsReply())
+            : SafeAsync(ReviewsService, "ratings",
+                token => reviews.GetRatingsForRoutesAsync(new GetRatingsForRoutesRequest { RouteIds = { routeIds } }, Options(token)).ResponseAsync,
+                warnings, ct);
+        var latestTasks = routeIds.ToDictionary(id => id, id => SafeAsync(ReviewsService, $"reviews of route {id}",
+            token => reviews.GetLatestReviewsAsync(new GetLatestReviewsRequest { RouteId = id, Count = LatestReviewsCount }, Options(token)).ResponseAsync,
+            warnings, ct));
 
-        await Task.WhenAll(routeTasks.Values.Cast<Task>()
-            .Concat(ratingTasks.Values)
-            .Concat(reviewTasks.Values));
+        await Task.WhenAll(latestTasks.Values.Cast<Task>().Append(routesTask).Append(ratingsTask));
 
-        var routes = await CollectAsync(routeTasks);
-        var ratings = await CollectAsync(ratingTasks);
-        var latestReviews = await CollectAsync(reviewTasks);
+        var routesReply = await routesTask;
+        var ratingsReply = await ratingsTask;
+        var routes = routesReply?.Routes.ToDictionary(r => r.Id);
+        var ratings = ratingsReply?.Ratings.ToDictionary(r => r.RouteId);
+        var latest = new Dictionary<long, ReviewsReply?>(latestTasks.Count);
+        foreach (var (routeId, task) in latestTasks)
+            latest[routeId] = await task;
 
         // 4. Композиція: одна поїздка на кожну позицію бронювання.
         var trips = bookingData.Items.Select(item =>
@@ -88,55 +130,73 @@ public class AggregationService(
             departures.TryGetValue(item.DepartureId, out var departure);
             var routeId = departure?.RouteId;
 
-            var route = routeId is null ? null : routes[routeId.Value];
-            if (route is not null && route.Id != routeId)
+            RouteReply? route = null;
+            RouteRatingReply? rating = null;
+            ReviewsReply? routeReviews = null;
+            if (routeId is { } id)
             {
-                warnings.Add($"{catalog.ServiceName} returned data for another route ({route.Id} instead of {routeId})");
-                route = null;
+                routes?.TryGetValue(id, out route);
+                ratings?.TryGetValue(id, out rating);
+                latest.TryGetValue(id, out routeReviews);
             }
 
             return new TripDto(
                 item.DepartureId,
                 item.Seats,
-                item.UnitPrice,
+                ToDecimal(item.UnitPrice),
                 item.RouteName,
-                departure?.DepartureDate,
+                departure?.DepartureDate?.ToDateTime(),
                 routeId,
                 route is null ? null : ToRouteInfo(route),
-                routeId is null ? null : ToRating(ratings[routeId.Value]),
-                routeId is null ? null : ToSnippets(latestReviews[routeId.Value]));
+                rating is null ? null : ToRating(rating),
+                routeId is null || routeReviews is null ? null : ToSnippets(routeReviews));
         }).ToList();
 
         var result = new FullBookingDto(
-            new BookingSummaryDto(bookingData.Id, bookingData.Status, bookingData.BookingDate,
-                bookingData.TotalAmount, bookingData.MeetingPoint, bookingData.Comment),
+            new BookingSummaryDto(bookingData.Id, bookingData.Status, ToDateTime(bookingData.BookingDate),
+                ToDecimal(bookingData.TotalAmount), bookingData.MeetingPoint, bookingData.Comment),
             customer is null ? null : new CustomerSummaryDto(customer.Id, customer.FullName, customer.Email),
             trips,
             warnings.ToList());
 
         activity?.SetTag("aggregation.complete", result.IsComplete);
-        logger.LogInformation("Booking {BookingId} aggregated: {TripsCount} trips, complete {IsComplete}, warnings {Warnings}",
+        logger.LogInformation("Booking {BookingId} aggregated via gRPC: {TripsCount} trips, complete {IsComplete}, warnings {Warnings}",
             bookingId, trips.Count, result.IsComplete, result.Warnings);
         return result;
     }
 
-    /// <summary>Огляд маршруту: Каталог і Відгуки паралельно. null — маршруту немає ніде.</summary>
-    public async Task<RouteOverviewDto?> GetRouteOverviewAsync(long routeId, CancellationToken ct)
+    // ---------- Огляд маршруту ----------
+
+    /// <summary>Огляд маршруту. Value = null — маршруту немає ніде; FromCache — відповідь з Redis.</summary>
+    public async Task<(RouteOverviewDto? Value, bool FromCache)> GetRouteOverviewAsync(long routeId, CancellationToken ct)
+    {
+        var key = AggregatorCacheKeys.RouteOverview(routeId);
+        if (await cache.GetAsync<RouteOverviewDto>(key, ct) is { } cached)
+            return (cached, true);
+
+        var result = await AggregateRouteOverviewAsync(routeId, ct);
+        await CacheIfCompleteAsync(key, result, result?.Warnings, ct);
+        return (result, false);
+    }
+
+    private async Task<RouteOverviewDto?> AggregateRouteOverviewAsync(long routeId, CancellationToken ct)
     {
         using var activity = Telemetry.StartActivity("AggregateRouteOverview");
         activity?.SetTag("route.id", routeId);
-        var warnings = new Warnings();
+        activity?.SetTag("aggregator.transport", "grpc");
+        var warnings = new AggregationWarnings();
 
-        var routeTask = SafeAsync(catalog.ServiceName, $"route {routeId}",
-            () => catalog.GetRouteAsync(routeId, ct), warnings, ct);
-        var ratingTask = SafeAsync(reviews.ServiceName, $"rating of route {routeId}",
-            () => reviews.GetRouteRatingAsync(routeId, ct), warnings, ct);
-        var reviewsTask = SafeAsync(reviews.ServiceName, $"reviews of route {routeId}",
-            () => reviews.GetLatestReviewsAsync(routeId, LatestReviewsCount, ct), warnings, ct);
+        var routeTask = SafeAsync(CatalogService, $"route {routeId}",
+            token => catalog.GetRouteAsync(new GetRouteRequest { Id = routeId }, Options(token)).ResponseAsync, warnings, ct);
+        var ratingTask = SafeAsync(ReviewsService, $"rating of route {routeId}",
+            token => reviews.GetRouteRatingAsync(new GetRouteRatingRequest { RouteId = routeId }, Options(token)).ResponseAsync, warnings, ct);
+        var reviewsTask = SafeAsync(ReviewsService, $"reviews of route {routeId}",
+            token => reviews.GetLatestReviewsAsync(new GetLatestReviewsRequest { RouteId = routeId, Count = LatestReviewsCount }, Options(token)).ResponseAsync,
+            warnings, ct);
 
         await Task.WhenAll(routeTask, ratingTask, reviewsTask);
 
-        var route = await routeTask;                             // задачі вже завершені — await без очікування
+        var route = await routeTask;
         var rating = await ratingTask;
         var latest = await reviewsTask;
         if (route is null && rating is null && warnings.Count == 0)
@@ -144,82 +204,74 @@ public class AggregationService(
 
         return new RouteOverviewDto(routeId,
             route is null ? null : ToRouteInfo(route),
-            ToRating(rating),
-            ToSnippets(latest),
+            rating is null ? null : ToRating(rating),
+            latest is null ? null : ToSnippets(latest),
             warnings.ToList());
     }
 
-    /// <summary>Результати вже завершених паралельних викликів за ключем (await, без блокування).</summary>
-    private static async Task<Dictionary<long, T?>> CollectAsync<T>(Dictionary<long, Task<T?>> tasks) where T : class
+    // ---------- Допоміжне ----------
+
+    private async Task CacheIfCompleteAsync<T>(string key, T? result, IReadOnlyList<string>? warnings, CancellationToken ct)
+        where T : class
     {
-        var results = new Dictionary<long, T?>(tasks.Count);
-        foreach (var (key, task) in tasks)
-            results[key] = await task;
-        return results;
+        if (result is null)
+            return;
+
+        if (warnings is { Count: > 0 })
+        {
+            logger.LogInformation("Partial aggregated response {CacheKey} is not cached: {Warnings}", key, warnings);
+            return;
+        }
+
+        await cache.SetAsync(key, result, ct);
     }
 
+    /// <summary>Deadline і скасування — у кожен виклик.</summary>
+    private static CallOptions Options(CancellationToken ct)
+        => new(deadline: DateTime.UtcNow.Add(CallDeadline), cancellationToken: ct);
+
     /// <summary>
-    /// Виклик необов'язкового сервісу: тривалість логується, недоступність перетворюється
-    /// на попередження (default замість винятку). Скасування клієнтом прокидається далі.
+    /// Виклик необов'язкового сервісу: NOT_FOUND -> null (даних немає), інші RpcException
+    /// (UNAVAILABLE, DEADLINE_EXCEEDED, INTERNAL...) -> попередження й null замість помилки всього запиту.
+    /// Скасування клієнтом прокидається далі.
     /// </summary>
-    private async Task<T?> SafeAsync<T>(string service, string resource, Func<Task<T?>> call,
-        Warnings warnings, CancellationToken ct) where T : class
+    private async Task<T?> SafeAsync<T>(string service, string resource, Func<CancellationToken, Task<T>> call,
+        AggregationWarnings warnings, CancellationToken ct) where T : class
     {
-        var sw = Stopwatch.StartNew();
+        var started = Stopwatch.GetTimestamp();
         try
         {
-            return await call();
+            return await call(ct);
         }
-        catch (Exception ex) when (IsUnavailable(ex, ct))
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
         {
-            logger.LogWarning(ex, "{Service} is unavailable for {Resource} after {ElapsedMs} ms: {Error}",
-                service, resource, sw.ElapsedMilliseconds, ex.Message);
+            return null;
+        }
+        catch (RpcException ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "{Service} is unavailable for {Resource} after {ElapsedMs} ms: {GrpcStatus} {GrpcDetail}",
+                service, resource, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds, ex.StatusCode, ex.Status.Detail);
             warnings.Add($"{service} is unavailable");
             return null;
         }
     }
 
-    /// <summary>Мережеві збої, таймаути, відмови resilience-pipeline і некоректні відповіді.</summary>
-    private static bool IsUnavailable(Exception ex, CancellationToken ct)
-        => !ct.IsCancellationRequested
-           && ex is HttpRequestException or TaskCanceledException or TimeoutException
-               or ExecutionRejectedException or JsonException;
+    // ---------- Повідомлення gRPC -> агреговані DTO ----------
 
-    private static RouteInfoDto ToRouteInfo(RouteResponse r) => new(
-        r.Id, r.Name, r.RegionName, DifficultyName(r.Difficulty), r.DistanceKm, r.DurationHours,
+    private static RouteInfoDto ToRouteInfo(RouteReply r) => new(
+        r.Id, r.Name, r.RegionName, DifficultyName(r.Difficulty), ToDecimal(r.DistanceKm), ToDecimal(r.DurationHours),
         r.ElevationGainM, r.Detail?.Season, r.Detail?.MaxAltitudeM);
 
-    private static RatingDto? ToRating(RouteRatingResponse? rating)
-        => rating is null ? null : new RatingDto(rating.AvgRating, rating.Count, rating.Distribution);
+    private static RatingDto ToRating(RouteRatingReply r)
+        => new(r.AvgRating, r.ReviewsCount, r.Distribution.ToDictionary(d => d.Key, d => d.Value));
 
-    private static IReadOnlyList<ReviewSnippetDto>? ToSnippets(IReadOnlyList<ReviewResponse>? items)
-        => items?.Select(r => new ReviewSnippetDto(r.AuthorName, r.Rating, r.Text, r.CreatedAt)).ToList();
+    private static IReadOnlyList<ReviewSnippetDto> ToSnippets(ReviewsReply reply)
+        => reply.Reviews.Select(r => new ReviewSnippetDto(r.AuthorName, r.Rating, r.Text, ToDateTime(r.CreatedAt))).ToList();
 
-    /// <summary>Каталог серіалізує enum складності числом; підтримано й рядок.</summary>
-    private static string DifficultyName(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Number when value.TryGetInt32(out var i) && i >= 0 && i < DifficultyNames.Length
-            => DifficultyNames[i],
-        JsonValueKind.String => value.GetString() ?? "Unknown",
-        _ => "Unknown"
-    };
+    private static string DifficultyName(RouteDifficulty difficulty)
+        => difficulty == RouteDifficulty.Unspecified ? "Unknown" : difficulty.ToString();
 
-    /// <summary>Потокобезпечний набір попереджень (паралельні виклики), без дублікатів.</summary>
-    private sealed class Warnings
-    {
-        private readonly List<string> _items = new();
+    private static decimal ToDecimal(DecimalValue? value) => value?.ToDecimal() ?? 0m;
 
-        public int Count { get { lock (_items) return _items.Count; } }
-
-        public void Add(string warning)
-        {
-            lock (_items)
-            {
-                if (!_items.Contains(warning))
-                    _items.Add(warning);
-            }
-        }
-
-        public List<string> ToList() { lock (_items) return _items.ToList(); }
-    }
+    private static DateTime ToDateTime(Timestamp? value) => value?.ToDateTime() ?? default;
 }

@@ -73,8 +73,8 @@ public sealed class CachedCustomerService(CustomerService inner, ICacheService c
 }
 
 /// <summary>
-/// Бронювання: картка кешується коротко; зміна статусу інвалідує її, а створення й скасування —
-/// ще й виїзди позицій (змінюється кількість вільних місць).
+/// Бронювання: картка кешується коротко; зміна статусу інвалідує її й агреговану картку в Aggregator,
+/// а створення й скасування — ще й виїзди позицій (змінюється кількість вільних місць).
 /// </summary>
 public sealed class CachedBookingService(BookingService inner, ICacheService cache) : IBookingService
 {
@@ -94,13 +94,13 @@ public sealed class CachedBookingService(BookingService inner, ICacheService cac
     public async Task ConfirmAsync(long id, CancellationToken ct)
     {
         await inner.ConfirmAsync(id, ct);
-        await cache.InvalidateAsync("BookingConfirmed", ct, BookingCacheKeys.Booking(id));
+        await cache.InvalidateAsync("BookingConfirmed", ct, BookingCacheKeys.Booking(id), AggregatorCacheKeys.FullBooking(id));
     }
 
     public async Task<PaymentResultDto> PayAsync(long id, PayBookingDto input, CancellationToken ct)
     {
         var result = await inner.PayAsync(id, input, ct);
-        await cache.InvalidateAsync("BookingPaid", ct, BookingCacheKeys.Booking(id));
+        await cache.InvalidateAsync("BookingPaid", ct, BookingCacheKeys.Booking(id), AggregatorCacheKeys.FullBooking(id));
         return result;
     }
 
@@ -112,6 +112,7 @@ public sealed class CachedBookingService(BookingService inner, ICacheService cac
 
         var keys = SeatKeys(booking);
         keys.Add(BookingCacheKeys.Booking(id));
+        keys.Add(AggregatorCacheKeys.FullBooking(id));
         await cache.InvalidateAsync(keys, "BookingCancelled", ct);
     }
 

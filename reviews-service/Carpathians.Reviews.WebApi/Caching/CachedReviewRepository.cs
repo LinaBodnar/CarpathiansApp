@@ -8,7 +8,8 @@ namespace Carpathians.Reviews.WebApi.Caching;
 
 /// <summary>
 /// Декоратор репозиторію відгуків: кожна успішна зміна (створення, оновлення, коментар, видалення,
-/// синхронізація назви маршруту) інвалідує рейтинг і списки відгуків цього маршруту та топ маршрутів.
+/// синхронізація назви маршруту) інвалідує рейтинг і списки відгуків цього маршруту, топ маршрутів
+/// і агрегований огляд маршруту в Aggregator (спільний Redis).
 /// Інвалідація — на рівні запису в MongoDB, тож її не можна «забути» в жодному обробнику команд.
 /// </summary>
 public sealed class CachedReviewRepository(ReviewRepository inner, ICacheService cache) : IReviewRepository
@@ -51,5 +52,6 @@ public sealed class CachedReviewRepository(ReviewRepository inner, ICacheService
         => cache.InvalidateAsync(reason, ct,
             ReviewsCacheKeys.RouteRating(routeId),
             ReviewsCacheKeys.RouteVersion(routeId),
-            ReviewsCacheKeys.TopRatedVersion);
+            ReviewsCacheKeys.TopRatedVersion,
+            AggregatorCacheKeys.RouteOverview(routeId));
 }

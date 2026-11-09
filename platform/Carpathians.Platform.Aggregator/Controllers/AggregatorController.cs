@@ -4,7 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Carpathians.Platform.Aggregator.Controllers;
 
-/// <summary>Агрегувальні ендпоінти: одна відповідь з даними кількох мікросервісів.</summary>
+/// <summary>
+/// Агрегувальні ендпоінти: одна відповідь з даними кількох мікросервісів.
+/// Для зовнішніх клієнтів (через Gateway) Aggregator лишається HTTP-ендпоінтом, а мікросервіси викликає через gRPC.
+/// Заголовок X-Cache: HIT — відповідь з Redis без жодного gRPC-виклику, MISS — зібрана заново.
+/// </summary>
 [ApiController]
 [Route("api/aggregator")]
 [Produces("application/json")]
@@ -23,7 +27,8 @@ public class AggregatorController(AggregationService aggregation) : ControllerBa
     {
         try
         {
-            var result = await aggregation.GetFullBookingAsync(id, ct);
+            var (result, fromCache) = await aggregation.GetFullBookingAsync(id, ct);
+            SetCacheHeader(fromCache);
             return result is null
                 ? Problem(statusCode: StatusCodes.Status404NotFound, title: "Booking not found",
                     detail: $"Booking {id} was not found")
@@ -42,10 +47,13 @@ public class AggregatorController(AggregationService aggregation) : ControllerBa
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RouteOverviewDto>> GetRouteOverview(long routeId, CancellationToken ct)
     {
-        var result = await aggregation.GetRouteOverviewAsync(routeId, ct);
+        var (result, fromCache) = await aggregation.GetRouteOverviewAsync(routeId, ct);
+        SetCacheHeader(fromCache);
         return result is null
             ? Problem(statusCode: StatusCodes.Status404NotFound, title: "Route not found",
                 detail: $"Route {routeId} was not found")
             : Ok(result);
     }
+
+    private void SetCacheHeader(bool fromCache) => Response.Headers["X-Cache"] = fromCache ? "HIT" : "MISS";
 }
