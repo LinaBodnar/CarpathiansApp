@@ -2,6 +2,7 @@ using Carpathians.Reviews.Domain.Entities;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Extensions.DiagnosticSources;
 
 namespace Carpathians.Reviews.Infrastructure.Persistence;
 
@@ -22,7 +23,12 @@ public class MongoDbContext
         if (string.IsNullOrWhiteSpace(settings.ConnectionString))
             throw new InvalidOperationException("MongoDb:ConnectionString is not configured");
 
-        Client = new MongoClient(settings.ConnectionString);
+        // Підписка драйвера на трасування: кожна команда MongoDB — окремий span в OpenTelemetry
+        var clientSettings = MongoClientSettings.FromConnectionString(settings.ConnectionString);
+        clientSettings.ClusterConfigurator = cluster => cluster.Subscribe(
+            new DiagnosticsActivityEventSubscriber(new InstrumentationOptions { CaptureCommandText = true }));
+
+        Client = new MongoClient(clientSettings);
         Database = Client.GetDatabase(settings.DatabaseName);
     }
 

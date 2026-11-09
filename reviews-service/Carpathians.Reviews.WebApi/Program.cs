@@ -4,13 +4,23 @@ using Carpathians.Reviews.Infrastructure;
 using Carpathians.Reviews.Infrastructure.HealthChecks;
 using Carpathians.Reviews.WebApi.Mappings;
 using Carpathians.Reviews.WebApi.Middleware;
+using MongoDB.Driver;
 using Serilog;
+using PlatformCorrelation = Carpathians.Platform.ServiceDefaults.Correlation.CorrelationIdMiddleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
-    .Enrich.FromLogContext());
+// Спільні налаштування платформи: Serilog, OpenTelemetry, health checks, service discovery
+builder.AddServiceDefaults();
+
+// Aspire передає рядок підключення як ConnectionStrings:ReviewsDb (з іменем бази в URL);
+// без Aspire використовується секція MongoDb з appsettings.json.
+if (builder.Configuration.GetConnectionString("ReviewsDb") is { Length: > 0 } aspireMongo)
+{
+    builder.Configuration["MongoDb:ConnectionString"] = aspireMongo;
+    if (MongoUrl.Create(aspireMongo).DatabaseName is { Length: > 0 } databaseName)
+        builder.Configuration["MongoDb:DatabaseName"] = databaseName;
+}
 
 // Шари Clean Architecture: кожен шар надає власний метод розширення
 // (+ збірка WebApi з ApiMappingProfile: контракти API -> команди)
@@ -22,7 +32,7 @@ builder.Services
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
 {
     ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier;
-    if (ctx.HttpContext.Response.Headers.TryGetValue(CorrelationIdMiddleware.CorrelationHeader, out var correlationId))
+    if (ctx.HttpContext.Request.Headers.TryGetValue(PlatformCorrelation.HeaderName, out var correlationId))
         ctx.ProblemDetails.Extensions["correlationId"] = correlationId.ToString();
 });
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -41,7 +51,7 @@ builder.Services.AddSwaggerGen(o =>
 
 var app = builder.Build();
 
-app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseCorrelationId();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
@@ -53,7 +63,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapDefaultEndpoints();                          // /health (у т. ч. MongoDB) і /alive
 
 app.Run();
 

@@ -8,13 +8,11 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Спільні налаштування платформи: Serilog, OpenTelemetry, health checks, service discovery
+builder.AddServiceDefaults();
+
 var connectionString = builder.Configuration.GetConnectionString("BookingDb")
                        ?? throw new InvalidOperationException("Connection string 'BookingDb' is missing");
-
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console());
 
 builder.Services.AddScoped<IUnitOfWork>(_ => new UnitOfWork(connectionString));
 builder.Services.AddScoped<ICustomerService, CustomerService>();
@@ -35,6 +33,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.UseCorrelationId();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();          
@@ -46,4 +45,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapDefaultEndpoints();
 app.Run();

@@ -14,13 +14,11 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Спільні налаштування платформи: Serilog, OpenTelemetry, health checks, service discovery
+builder.AddServiceDefaults();
+
 var connectionString = builder.Configuration.GetConnectionString("CatalogDb")
                        ?? throw new InvalidOperationException("Connection string 'CatalogDb' is missing");
-
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console());
 
 // Database
 builder.Services.AddDbContext<CatalogDbContext>(o => o
@@ -94,7 +92,7 @@ if (!app.Environment.IsProduction())
     }
 }
 
-app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseCorrelationId();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
@@ -106,4 +104,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapDefaultEndpoints();
 app.Run();
