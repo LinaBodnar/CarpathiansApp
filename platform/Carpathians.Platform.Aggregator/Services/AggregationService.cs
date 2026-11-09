@@ -52,14 +52,14 @@ public class AggregationService(
         var departureIds = bookingData.Items.Select(i => i.DepartureId).Distinct().ToList();
         var customerTask = SafeAsync(booking.ServiceName, $"customer {bookingData.CustomerId}",
             () => booking.GetCustomerAsync(bookingData.CustomerId, ct), warnings, ct);
-        var departureTasks = departureIds.ToDictionary(id => id, id => SafeAsync(booking.ServiceName,
-            $"departure {id}", () => booking.GetDepartureAsync(id, ct), warnings, ct));
+        var departureTasks = departureIds.Select(id => SafeAsync(booking.ServiceName,
+            $"departure {id}", () => booking.GetDepartureAsync(id, ct), warnings, ct)).ToList();
 
-        await Task.WhenAll(departureTasks.Values.Cast<Task>().Append(customerTask));
+        await Task.WhenAll(departureTasks.Cast<Task>().Append(customerTask));
+        var customer = await customerTask;                       // уже завершено — без блокування
 
         // Узгодженість: беремо лише виїзди, які справді належать позиціям цього бронювання.
-        var departures = departureTasks
-            .Select(t => t.Value.Result)
+        var departures = (await Task.WhenAll(departureTasks))
             .Where(d => d is not null && departureIds.Contains(d.Id))
             .ToDictionary(d => d!.Id, d => d!);
 
@@ -78,13 +78,17 @@ public class AggregationService(
             .Concat(ratingTasks.Values)
             .Concat(reviewTasks.Values));
 
+        var routes = await CollectAsync(routeTasks);
+        var ratings = await CollectAsync(ratingTasks);
+        var latestReviews = await CollectAsync(reviewTasks);
+
         // 4. Композиція: одна поїздка на кожну позицію бронювання.
         var trips = bookingData.Items.Select(item =>
         {
             departures.TryGetValue(item.DepartureId, out var departure);
             var routeId = departure?.RouteId;
 
-            var route = routeId is null ? null : routeTasks[routeId.Value].Result;
+            var route = routeId is null ? null : routes[routeId.Value];
             if (route is not null && route.Id != routeId)
             {
                 warnings.Add($"{catalog.ServiceName} returned data for another route ({route.Id} instead of {routeId})");
@@ -99,11 +103,10 @@ public class AggregationService(
                 departure?.DepartureDate,
                 routeId,
                 route is null ? null : ToRouteInfo(route),
-                routeId is null ? null : ToRating(ratingTasks[routeId.Value].Result),
-                routeId is null ? null : ToSnippets(reviewTasks[routeId.Value].Result));
+                routeId is null ? null : ToRating(ratings[routeId.Value]),
+                routeId is null ? null : ToSnippets(latestReviews[routeId.Value]));
         }).ToList();
 
-        var customer = customerTask.Result;
         var result = new FullBookingDto(
             new BookingSummaryDto(bookingData.Id, bookingData.Status, bookingData.BookingDate,
                 bookingData.TotalAmount, bookingData.MeetingPoint, bookingData.Comment),
@@ -133,16 +136,26 @@ public class AggregationService(
 
         await Task.WhenAll(routeTask, ratingTask, reviewsTask);
 
-        var route = routeTask.Result;
-        var rating = ratingTask.Result;
+        var route = await routeTask;                             // задачі вже завершені — await без очікування
+        var rating = await ratingTask;
+        var latest = await reviewsTask;
         if (route is null && rating is null && warnings.Count == 0)
             return null;
 
         return new RouteOverviewDto(routeId,
             route is null ? null : ToRouteInfo(route),
             ToRating(rating),
-            ToSnippets(reviewsTask.Result),
+            ToSnippets(latest),
             warnings.ToList());
+    }
+
+    /// <summary>Результати вже завершених паралельних викликів за ключем (await, без блокування).</summary>
+    private static async Task<Dictionary<long, T?>> CollectAsync<T>(Dictionary<long, Task<T?>> tasks) where T : class
+    {
+        var results = new Dictionary<long, T?>(tasks.Count);
+        foreach (var (key, task) in tasks)
+            results[key] = await task;
+        return results;
     }
 
     /// <summary>
