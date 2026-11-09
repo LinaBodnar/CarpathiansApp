@@ -27,12 +27,14 @@ public sealed class UnhandledExceptionBehavior<TRequest, TResponse>(
         {
             logger.LogWarning("{RequestName} rejected: {ExceptionType} {Message}",
                 typeof(TRequest).Name, ex.GetType().Name, ex.Message);
+            ex.MarkLogged();
             throw;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Unhandled exception for {RequestName} {@Request}",
                 typeof(TRequest).Name, request);
+            ex.MarkLogged();
             throw;
         }
     }

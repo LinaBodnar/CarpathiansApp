@@ -18,8 +18,14 @@ builder.Services
     .AddApplication(builder.Configuration, typeof(ApiMappingProfile).Assembly)  // MediatR, Behaviors, валідатори, AutoMapper
     .AddInfrastructure(builder.Configuration);                                  // MongoDB: мапінг, контекст, репозиторії, запити
 
+// Централізована обробка помилок: винятки -> ProblemDetails з коректним статусом
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
-    ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
+{
+    ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier;
+    if (ctx.HttpContext.Response.Headers.TryGetValue(CorrelationIdMiddleware.CorrelationHeader, out var correlationId))
+        ctx.ProblemDetails.Extensions["correlationId"] = correlationId.ToString();
+});
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddHealthChecks()
     .AddCheck<MongoDbHealthCheck>("mongodb", tags: new[] { "db", "ready" });
