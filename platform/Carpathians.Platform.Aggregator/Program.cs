@@ -71,6 +71,7 @@ builder.Services.AddSingleton(sp => new AggregatedResponseCache(
 
 builder.Services.AddScoped<AggregationService>();          // gRPC — основна агрегація
 builder.Services.AddScoped<HttpAggregationService>();      // HTTP (Лаб. 05) — для порівняння
+builder.Services.AddScoped<TransportBenchmarkService>();   // вимірювання HTTP vs gRPC
 
 // JSON у camelCase, null-значення не серіалізуються
 builder.Services.ConfigureHttpJsonOptions(o =>

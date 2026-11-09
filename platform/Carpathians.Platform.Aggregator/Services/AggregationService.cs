@@ -55,7 +55,11 @@ public class AggregationService(
         return (result, false);
     }
 
-    private async Task<FullBookingDto?> AggregateFullBookingAsync(long bookingId, CancellationToken ct)
+    /// <summary>
+    /// Збирання картки бронювання через gRPC без кешу агрегованих відповідей
+    /// (використовується й для вимірювання затримок HTTP vs gRPC). null — бронювання не існує.
+    /// </summary>
+    public async Task<FullBookingDto?> AggregateFullBookingAsync(long bookingId, CancellationToken ct)
     {
         using var activity = Telemetry.StartActivity("AggregateFullBooking");
         activity?.SetTag("booking.id", bookingId);

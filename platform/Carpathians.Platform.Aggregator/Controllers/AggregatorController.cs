@@ -12,7 +12,7 @@ namespace Carpathians.Platform.Aggregator.Controllers;
 [ApiController]
 [Route("api/aggregator")]
 [Produces("application/json")]
-public class AggregatorController(AggregationService aggregation) : ControllerBase
+public class AggregatorController(AggregationService aggregation, TransportBenchmarkService benchmark) : ControllerBase
 {
     /// <summary>
     /// Повна картка бронювання: бронювання й виїзди (booking-api) + маршрути (catalog-api)
@@ -52,6 +52,23 @@ public class AggregatorController(AggregationService aggregation) : ControllerBa
         return result is null
             ? Problem(statusCode: StatusCodes.Status404NotFound, title: "Route not found",
                 detail: $"Route {routeId} was not found")
+            : Ok(result);
+    }
+
+    /// <summary>
+    /// Порівняння затримок HTTP REST (Лаб. 05) і gRPC (Лаб. 06) на картці бронювання:
+    /// середнє, медіана, p95, мінімум і максимум у мілісекундах; кеш агрегованих відповідей не використовується.
+    /// </summary>
+    [HttpGet("benchmark/bookings/{id:long}")]
+    [ProducesResponseType(typeof(TransportComparisonDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TransportComparisonDto>> CompareTransports(
+        long id, [FromQuery] int iterations = 20, CancellationToken ct = default)
+    {
+        var result = await benchmark.CompareFullBookingAsync(id, iterations, ct);
+        return result is null
+            ? Problem(statusCode: StatusCodes.Status404NotFound, title: "Booking not found",
+                detail: $"Booking {id} was not found")
             : Ok(result);
     }
 

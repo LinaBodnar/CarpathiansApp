@@ -31,6 +31,7 @@ carpathians-databases/
 │   ├── schema.sql
 │   └── seed.sql
 ├── platform/                   # Проєкт №5 — .NET Aspire: AppHost, ServiceDefaults, Gateway, Aggregator
+│                               # Проєкт №6 — gRPC-контракти (Protos/), дворівневий кеш, Aggregator на gRPC
 ├── reviews-service/            # Проєкт №3 — сервіс відгуків (Clean Architecture + CQRS + MongoDB)
 ├── reviews-db/
 │   ├── init.js                 # колекції, JSON Schema, індекси
@@ -521,3 +522,23 @@ SQL Server і MongoDB, три сервіси, Aggregator і Gateway однією
 dotnet user-secrets set "Parameters:sql-password" "YourStrong!Passw0rd" --project platform/Carpathians.Platform.AppHost
 dotnet run --project platform/Carpathians.Platform.AppHost
 ```
+
+## Проєкт №6 — gRPC-виклики та кешування
+
+Платформу з Лаб. 05 розширено оптимізацією продуктивності та внутрішньою комунікацією через gRPC:
+
+- **Redis** запускається через AppHost (`AddRedis("redis").WithDataVolume()`) і підключений до всіх сервісів
+  та Aggregator через Aspire-інтеграцію (`AddRedisDistributedCache("redis")`).
+- **Дворівневий кеш** у кожному мікросервісі: `IMemoryCache` (L1, з `SizeLimit` і політиками витіснення) →
+  Redis (L2, спільний для всіх екземплярів) → база даних; інвалідація синхронно з операцією запису;
+  недоступний Redis не валить сервіс. Найповніше — у Каталозі (картки маршрутів, довідник регіонів, прогрівання).
+- **gRPC-контракти** (`booking.proto`, `catalog.proto`, `reviews.proto`) і gRPC-сервіси з перетворенням доменних
+  винятків на `RpcException` (`NOT_FOUND`, `INVALID_ARGUMENT`, ...).
+- **Aggregator на gRPC**: типізовані gRPC-клієнти з service discovery, паралельні виклики `Task.WhenAll`,
+  часткові відмови, кеш агрегованих відповідей у Redis (30 с).
+- **Обсервабіліті**: gRPC-spans клієнта й сервера в одному trace, структуровані логи gRPC і кешу,
+  метрики `cache.hits` / `cache.misses` / `cache.hit_ratio`, CorrelationId у метаданих gRPC-викликів;
+  ендпоінт порівняння затримок HTTP і gRPC.
+
+Повний опис — [`platform/README.md`](platform/README.md#8-grpc-і-кешування-лаб-06). Запуск — так само, як у Проєкті №5.
+

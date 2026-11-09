@@ -12,3 +12,12 @@ GET {{gateway}}/api/aggregator/routes/1/overview
 
 ### Неіснуюче бронювання -> 404
 GET {{gateway}}/api/aggregator/bookings/99999/full
+
+### Кеш агрегованих відповідей (Лаб. 06): перший запит — X-Cache: MISS, повторний протягом 30 с — X-Cache: HIT
+GET {{gateway}}/api/aggregator/bookings/1/full
+
+### Повторний запит — відповідь з Redis без жодного gRPC-виклику
+GET {{gateway}}/api/aggregator/bookings/1/full
+
+### Порівняння затримок HTTP (Лаб. 05) і gRPC (Лаб. 06): 50 викликів кожним транспортом
+GET {{gateway}}/api/aggregator/benchmark/bookings/1?iterations=50

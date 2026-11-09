@@ -4,6 +4,9 @@
 **ServiceDefaults** (Serilog, OpenTelemetry, CorrelationId, health checks), **API Gateway** на YARP
 і **Aggregator** (Aggregator Pattern).
 
+Практичне заняття №06: **кешування** (IMemoryCache L1 + Redis L2), **gRPC-API** мікросервісів,
+**Aggregator на gRPC** і обсервабіліті gRPC-трафіку та кешу — розділ [8](#8-grpc-і-кешування-лаб-06).
+
 ---
 
 ## 1. Архітектура
@@ -17,11 +20,13 @@
                          └───┬───────┬───────┬──────┘
                              │       │       │        └──────────────┐
                              ▼       ▼       ▼                       ▼
-                     booking-api catalog-api reviews-api      aggregator
-                         │           │           │        (Task.WhenAll до трьох сервісів)
-                         ▼           ▼           ▼
-                   SQL Server   SQL Server    MongoDB
-                  BookingContext CatalogContext ReviewContext
+                     booking-api catalog-api reviews-api ◄═gRPC═ aggregator
+                         │           │           │        (Task.WhenAll, HTTP/2)
+                         ▼           ▼           ▼            │
+                   SQL Server   SQL Server    MongoDB         │
+                  BookingContext CatalogContext ReviewContext │
+                         ▲           ▲           ▲            │
+                         └─── Redis (L2-кеш, спільний) ───────┘   + IMemoryCache (L1) у кожному сервісі
 ```
 
 | Компонент | Проєкт | Призначення |
@@ -177,6 +182,9 @@ Typed HttpClients (`BookingClient`, `CatalogClient`, `ReviewsClient`) зверт
 `https+http://<ім'я ресурсу>`; кожен виклик логується («Calling catalog-api …» → «responded in N ms»).
 Resilience агрегатора: одна повторна спроба, 5 с на спробу, 10 с загалом. JSON — camelCase без null-полів.
 
+> З Лаб. 06 Aggregator викликає мікросервіси через **gRPC** (розділ [8.3](#83-grpc)), а відповіді кешує в Redis.
+> Реалізація через HTTP збережена як `HttpAggregationService` — для порівняння затримок (розділ [8.5](#85-порівняння-http-і-grpc)).
+
 ---
 
 ## 7. Перевірка
@@ -200,3 +208,126 @@ curl -i -H "X-Correlation-Id: demo-0001" http://localhost:5000/api/aggregator/bo
 | часткова відповідь | Dashboard → `reviews-api` → Stop; повторити агрегувальний запит → 200, `"isComplete": false`, `warnings: ["reviews-api is unavailable"]`; у логах aggregator — Warning з деталями; Start → відповідь знову повна |
 | Gateway ≠ простий проксі | той самий запит напряму на адресу `booking-api` з Dashboard: немає логу маршрутизації Gateway, CorrelationId генерує сам сервіс |
 | зміни в сервісах | `Program.cs` (AddServiceDefaults, UseCorrelationId, MapDefaultEndpoints); у Відгуках — підписка MongoDB на трасування, у Бронюванні — логування бізнес-подій і власні spans |
+
+---
+
+## 8. gRPC і кешування (Лаб. 06)
+
+### 8.1. Нові елементи
+
+| Елемент | Де | Що робить |
+|---|---|---|
+| Redis | `AppHost.cs`: `AddRedis("redis").WithDataVolume("carpathians-redis-data")` | контейнер Redis; `WithReference(redis).WaitFor(redis)` для трьох сервісів і Aggregator — рядок підключення `ConnectionStrings:redis` |
+| L1-кеш | `ServiceDefaults/Caching/CachingExtensions.cs` | `AddMemoryCache`: `SizeLimit` (Size запису = КБ JSON), `CompactionPercentage`, `TrackStatistics`; TTL і пріоритети — у політиках сервісів |
+| L2-кеш | `Program.cs` кожного сервісу: `builder.AddRedisDistributedCache("redis")` | `IDistributedCache` поверх Redis (Aspire: повторні підключення, логування, трасування) |
+| Дворівневий кеш | `ServiceDefaults/Caching/CacheService.cs` | cache-aside L1 → L2 → БД, заповнення рівнів на зворотному шляху, захист від cache stampede, GZip для значень > 16 КБ, запобіжник для Redis |
+| Декоратори з кешем | `*/Caching/Cached*.cs` у кожному сервісі | бізнес-логіка Лаб. 02–04 не змінюється; REST і gRPC працюють через ті самі інтерфейси, тож кеш діє для обох протоколів |
+| Прогрівання | `catalog-service/.../Caching/CatalogCacheWarmupService.cs` | `BackgroundService`: регіони й популярні маршрути — під час старту і кожні 10 хв |
+| gRPC-контракти | `*/Protos/*.proto`, спільні типи — `platform/Protos/common/types.proto` | `GrpcServices="Server"` у сервісах, ті самі файли з `GrpcServices="Client"` в Aggregator |
+| gRPC-сервіси | `*/Grpc/*GrpcService.cs` | адаптери над BLL/MediatR; `MapGrpcService<T>()`, `AddGrpc(...)` з interceptor-ами |
+| gRPC Aggregator | `Aggregator/Services/AggregationService.cs` | `AddGrpcClient<T>(https://<сервіс>)`, паралельні виклики, `RpcException` → Warnings, кеш агрегатів у Redis |
+| Обсервабіліті | `ServiceDefaults/Grpc/GrpcServerLoggingInterceptor.cs`, `Aggregator/Grpc/GrpcClientLoggingInterceptor.cs`, `ServiceDefaults/Caching/CacheMetrics.cs` | spans і логи gRPC, метрики кешу (Meter `Carpathians.Cache`) |
+
+### 8.2. Кешування
+
+**Cache-aside з запасним шляхом.** `ICacheService.GetOrCreateAsync(key, factory, policy)`:
+1. L1 (`IMemoryCache`) — є запис → відповідь без мережі й БД;
+2. L2 (Redis) — є запис → кладеться в L1 і повертається;
+3. база даних → результат записується в Redis і в L1.
+
+Одночасні промахи того самого ключа не йдуть у базу паралельно: до джерела звертається лише один запит,
+решта беруть уже заповнений кеш. `null` (немає даних) не кешується; винятки «не знайдено» прокидаються далі.
+
+**Ключі** мають передбачувану схему з префіксом сервісу (ізоляція в спільному Redis):
+
+| Сервіс | Ключі | L1 TTL | L2 TTL | Інвалідація |
+|---|---|---|---|---|
+| Каталог | `catalog:route:{id}` | 2 хв (sliding 1 хв) | 30 хв | зміна маршруту, його деталей, спорядження, точок; зміна точки на маршруті; перейменування регіону |
+| | `catalog:routes:v{версія}:page:…`, `:all`, `:popular-challenging` | 1 хв | 5 хв | ключ-версія `catalog:routes:version` — одна інвалідація скидає всі списки |
+| | `catalog:regions:all`, `catalog:region:{id}` | 5 хв | 2 год | створення/зміна/видалення регіону |
+| Бронювання | `booking:departure:{id}`, `booking:departures:all` | 30 с | 5 хв / 2 хв | зміна виїзду; створення і скасування бронювання (вільні місця) |
+| | `booking:customer:{id}` | 30 с | 2 хв | зміна/видалення клієнта (персональні дані — короткий TTL) |
+| | `booking:booking:{id}` | 15 с | 1 хв | підтвердження, оплата, скасування |
+| Відгуки | `reviews:route:{id}:rating`, `reviews:route:{id}:v{версія}:list:…` | 1 хв / 30 с | 10 хв / 3 хв | будь-який запис відгуку маршруту (декоратор репозиторію) |
+| | `reviews:routes:top-rated:v{версія}:…` | 1 хв | 10 хв | будь-який запис відгуку |
+| Aggregator | `aggregator:booking:{id}:full`, `aggregator:route:{id}:overview` | — | 30 с | сервіси видаляють ключ при зміні бронювання, маршруту чи відгуків |
+
+- **L1 завжди коротший за L2** (перевіряється в `CachePolicy.Validate`): зміна, яку інші екземпляри вже бачать
+  у Redis, не «застрягне» в пам'яті одного екземпляра довше за L1 TTL. Оновлення L1 через Redis pub/sub не використовується.
+- **Absolute expiration** — довідники (регіони); **sliding + absolute** — часто запитувані картки маршрутів.
+- **Інвалідація синхронна з записом**: декоратор видаляє ключі одразу після `SaveChanges`, до відповіді клієнту.
+- **Агрегований кеш має найкоротший TTL (30 с)** і не зберігає часткових відповідей (з `warnings`).
+- **Redis недоступний** → запобіжник на 30 с вимикає L2: сервіс відповідає з L1 і бази (повільніше), health check —
+  `Degraded`, а не `Unhealthy`; старт сервісу від Redis не залежить (`AbortOnConnectFail = false`).
+- **Статистика кешу**: `GET /health/cache` кожного сервісу (записи і розмір L1, частка попадань L1/L2, стан Redis).
+
+### 8.3. gRPC
+
+**Контракти.** `package carpathians.{сервіс}.v1`, коментарі до сервісів і полів потрапляють у згенерований код,
+необов'язкові значення — wrapper-типи (`google.protobuf.StringValue` → `string?`), дати — `Timestamp`,
+гроші й кілометри — спільний `DecimalValue` (units + nanos) замість `double`. Номери полів після публікації не змінюються:
+саме вони, а не імена, визначають бінарний формат (див. перевірку в 8.6).
+
+| Сервіс | RPC |
+|---|---|
+| `carpathians.booking.v1.BookingGrpc` | `GetBooking`, `GetCustomer`, `GetDeparturesByIds` |
+| `carpathians.catalog.v1.CatalogGrpc` | `GetRoute`, `GetRoutesByIds`, `ListRegions` |
+| `carpathians.reviews.v1.ReviewsGrpc` | `GetRouteRating`, `GetRatingsForRoutes`, `GetLatestReviews` |
+
+**HTTP/2.** Сервіси запускаються з профілем `https` (`launchProfileName: "https"` в AppHost), Kestrel —
+`Http1AndHttp2`: REST через Gateway і gRPC на тому самому HTTPS-endpoint, HTTP/2 узгоджується через ALPN.
+
+**Помилки.** Некоректний запит → `INVALID_ARGUMENT` (перевірка в методі або FluentValidation);
+доменні винятки перетворює interceptor сервісу: «не знайдено» → `NOT_FOUND`, бізнес-правило → `FAILED_PRECONDITION`,
+конфлікт → `ALREADY_EXISTS`/`ABORTED`, недоступна MongoDB → `UNAVAILABLE`; неочікувана помилка → `INTERNAL` без деталей.
+
+**Aggregator.** gRPC-клієнти створює фабрика HttpClient, тому для них діють налаштування ServiceDefaults:
+service discovery (`https://catalog-api`), resilience і `CorrelationIdHandler` (заголовок `X-Correlation-Id`
+стає метаданими gRPC-виклику). Картка бронювання: бронювання (обов'язкове) → клієнт і виїзди паралельно →
+маршрути, рейтинги й відгуки паралельно (пакетні RPC замість виклику на кожен елемент). Кожен виклик має
+deadline 5 с і `CancellationToken`. `RpcException` необов'язкового сервісу (`UNAVAILABLE`, `DEADLINE_EXCEEDED`, ...)
+→ попередження у `warnings`, `NOT_FOUND` → «даних немає». Для зовнішніх клієнтів Aggregator лишається HTTP-ендпоінтом;
+заголовок `X-Cache: HIT/MISS` показує, чи відповідь узята з Redis.
+
+### 8.4. Обсервабіліті
+
+| Що | Де видно |
+|---|---|
+| gRPC-spans | Traces: `gateway` → `aggregator` (`AggregateFullBooking`) → span клієнта `carpathians.catalog.v1.CatalogGrpc/GetRoutesByIds` (rpc.system, rpc.service, rpc.method, rpc.grpc.status_code, cache.result) → HTTP/2 POST → span сервера в `catalog-api` (ті самі rpc.* + correlation.id) → SQL / MongoDB / Redis |
+| логи gRPC | Structured logs, `Protocol = grpc`: `gRPC {GrpcMethod} from {Peer}: {GrpcStatus} in {ElapsedMs} ms, cache {CacheResult}`; помилки — Warning/Error зі stack trace |
+| логи кешу | `Cache hit {CacheKey} at {CacheLevel}...`, `Cache miss ...`, `Cache invalidated {CacheKeys}, reason {Reason}`, витіснення, недоступність Redis |
+| метрики кешу | Metrics → Meter `Carpathians.Cache`: `cache.hits`, `cache.misses` (теги `cache.level` = l1/l2, `cache.transport` = http/grpc/background), `cache.hit_ratio`, `cache.memory.entries`, `cache.memory.size`, `cache.evictions`, `cache.invalidations`, `cache.operation.duration`, `cache.distributed.available` |
+| CorrelationId | у метаданих кожного gRPC-виклику (`x-correlation-id`), в атрибуті `correlation.id` span сервера й у логах усіх сервісів |
+| ознака попадання в кеш | trailer `x-cache` у відповіді gRPC (`l1`, `l2`, `source` або `l1=2,source=1` для пакетних методів) |
+
+### 8.5. Порівняння HTTP і gRPC
+
+`GET http://localhost:5000/api/aggregator/benchmark/bookings/1?iterations=50` — та сама картка бронювання
+збирається поперемінно через HTTP REST (реалізація Лаб. 05, `HttpAggregationService`) і через gRPC,
+без кешу агрегованих відповідей, після прогріву. Відповідь: середнє, медіана, p95, мінімум і максимум (мс)
+для кожного транспорту та `grpcSpeedup` = HTTP avg / gRPC avg. Кожен виклик — окремий trace, тож результати
+звіряються в Traces (`AggregateFullBooking (HTTP)` проти `AggregateFullBooking`).
+
+Чому gRPC швидший: бінарний Protobuf замість JSON, одне постійне HTTP/2-з'єднання з мультиплексуванням
+паралельних викликів замість окремих HTTP/1.1-з'єднань, пакетні RPC (`GetRoutesByIds`, `GetRatingsForRoutes`,
+`GetDeparturesByIds`) замість запиту на кожен маршрут чи виїзд.
+
+### 8.6. Перевірка
+
+| Що перевірити | Як |
+|---|---|
+| Redis Running | Dashboard → Resources: `redis` у статусі Running |
+| повторний запит без SQL | двічі `GET /api/routes/1` → у trace другого запиту немає span SQL (catalog-api відповів з L1) |
+| PUT → свіжі дані | `PUT /api/routes/1` → наступний `GET /api/routes/1` повертає оновлені дані; у логах `Cache invalidated ... RouteUpdated` |
+| дані з Redis | перезапустити `catalog-api` (L1 порожній) → `GET /api/routes/1` без SQL, у логах `Cache hit catalog:route:1 at l2` |
+| Redis зупинено | Dashboard → `redis` → Stop: запити працюють (з бази), `/health/cache` → `Degraded`, у логах Warning про недоступний L2; Start → кеш знову працює |
+| NOT_FOUND | Postman → gRPC → `https://localhost:<https-порт catalog-api>`, server reflection, `GetRoute {"id": 99999}` → `NOT_FOUND` |
+| gRPC-spans в одному trace | `GET /api/aggregator/bookings/1/full` → Traces: span клієнта Aggregator і span сервера сервісу — батько і нащадок |
+| кеш агрегатів | повторний запит → `X-Cache: HIT`, у trace немає gRPC-викликів |
+| часткова відповідь | Dashboard → `catalog-api` → Stop → `isComplete: false`, `warnings: ["catalog-api is unavailable"]` |
+| метрики | Metrics → `catalog-api` → `cache.hits` > 0 |
+| HTTP vs gRPC | `GET /api/aggregator/benchmark/bookings/1?iterations=50` |
+| сумісність Protobuf | Aggregator і catalog-api збирають код з одного `catalog.proto`; для перевірки скопіювати його в Aggregator, змінити в копії номер поля `name = 4` на `name = 14` і вказати копію в `Carpathians.Platform.Aggregator.csproj` → Aggregator отримує порожню назву маршруту (поле з невідомим номером ігнорується); повернути як було |
+
+Готові запити — `Aggregator/Carpathians.Platform.Aggregator.http`.
+

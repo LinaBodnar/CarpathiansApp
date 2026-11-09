@@ -50,3 +50,14 @@ public record RouteOverviewDto(
 {
     public bool IsComplete => Warnings.Count == 0;
 }
+
+/// <summary>Затримки одного транспорту (мс) за серію викликів.</summary>
+public record TransportStatsDto(string Transport, double AvgMs, double P50Ms, double P95Ms, double MinMs, double MaxMs);
+
+/// <summary>Порівняння агрегації картки бронювання через HTTP REST і gRPC. GrpcSpeedup = HTTP avg / gRPC avg.</summary>
+public record TransportComparisonDto(
+    long BookingId,
+    int Iterations,
+    TransportStatsDto Http,
+    TransportStatsDto Grpc,
+    double GrpcSpeedup);
