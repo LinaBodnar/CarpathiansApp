@@ -1,0 +1,14 @@
+@aggregator = http://localhost:5110
+@gateway = http://localhost:5000
+
+### Повна картка бронювання напряму (в обхід Gateway)
+GET {{aggregator}}/api/aggregator/bookings/1/full
+
+### Те саме через Gateway (CorrelationId генерує Gateway)
+GET {{gateway}}/api/aggregator/bookings/1/full
+
+### Огляд маршруту: catalog-api + reviews-api паралельно
+GET {{gateway}}/api/aggregator/routes/1/overview
+
+### Неіснуюче бронювання -> 404
+GET {{gateway}}/api/aggregator/bookings/99999/full
