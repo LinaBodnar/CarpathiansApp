@@ -1,0 +1,18 @@
+// Спільні типи gRPC-контрактів платформи Carpathians.
+// Підключаються в .proto сервісів через import "common/types.proto".
+
+syntax = "proto3";
+
+package carpathians.common.v1;
+
+option csharp_namespace = "Carpathians.Grpc.Common";
+
+// Десяткове число без втрати точності (гроші, кілометри, години).
+// Значення = units + nanos / 1 000 000 000; знак nanos збігається зі знаком units.
+// double для грошей не використовується: 0.1 + 0.2 != 0.3.
+message DecimalValue {
+  // Ціла частина.
+  int64 units = 1;
+  // Дробова частина в мільярдних (від -999 999 999 до 999 999 999).
+  sfixed32 nanos = 2;
+}

@@ -1,0 +1,79 @@
+// gRPC-контракт сервісу бронювань (Лаб. 02) для внутрішніх викликів платформи.
+// Сервер — Carpathians.Booking.Api (GrpcServices="Server"), клієнт — Aggregator (GrpcServices="Client").
+// Номери полів після публікації не змінюються: саме вони визначають бінарний формат повідомлення.
+
+syntax = "proto3";
+
+package carpathians.booking.v1;
+
+option csharp_namespace = "Carpathians.Booking.Grpc";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "common/types.proto";
+
+// Читання бронювань, клієнтів і виїздів (для Aggregator).
+service BookingGrpc {
+  // Бронювання з позиціями. INVALID_ARGUMENT — id <= 0; NOT_FOUND — бронювання не існує.
+  rpc GetBooking (GetBookingRequest) returns (BookingReply);
+
+  // Клієнт. Персональні дані: кешуються лише з коротким TTL.
+  rpc GetCustomer (GetCustomerRequest) returns (CustomerReply);
+
+  // Кілька виїздів одним викликом. Ідентифікатори, яких немає, у відповіді пропускаються.
+  rpc GetDeparturesByIds (GetDeparturesByIdsRequest) returns (DeparturesReply);
+}
+
+message GetBookingRequest {
+  int64 id = 1;
+}
+
+message BookingItemReply {
+  int64 departure_id = 1;
+  // Назва маршруту на момент бронювання (знімок).
+  string route_name = 2;
+  carpathians.common.v1.DecimalValue unit_price = 3;
+  int32 seats = 4;
+}
+
+message BookingReply {
+  int64 id = 1;
+  int64 customer_id = 2;
+  // Pending | Confirmed | Paid | Cancelled
+  string status = 3;
+  google.protobuf.Timestamp booking_date = 4;
+  carpathians.common.v1.DecimalValue total_amount = 5;
+  string contact_phone = 6;
+  string meeting_point = 7;
+  google.protobuf.StringValue comment = 8;
+  repeated BookingItemReply items = 9;
+}
+
+message GetCustomerRequest {
+  int64 id = 1;
+}
+
+message CustomerReply {
+  int64 id = 1;
+  string email = 2;
+  string full_name = 3;
+  google.protobuf.StringValue phone = 4;
+}
+
+message GetDeparturesByIdsRequest {
+  repeated int64 ids = 1;
+}
+
+message DepartureReply {
+  int64 id = 1;
+  int64 route_id = 2;
+  google.protobuf.StringValue route_name = 3;
+  google.protobuf.Timestamp departure_date = 4;
+  carpathians.common.v1.DecimalValue price = 5;
+  int32 seats_total = 6;
+  int32 seats_available = 7;
+}
+
+message DeparturesReply {
+  repeated DepartureReply departures = 1;
+}

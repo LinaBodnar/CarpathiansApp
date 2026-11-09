@@ -1,0 +1,86 @@
+// gRPC-контракт сервісу Каталогу (Лаб. 03) для внутрішніх викликів платформи.
+// Сервер — Carpathians.Catalog.Api (GrpcServices="Server"), клієнт — Aggregator (GrpcServices="Client").
+// Номери полів після публікації не змінюються: саме вони визначають бінарний формат повідомлення.
+// Нове поле отримує новий номер; номер видаленого поля резервується (reserved).
+
+syntax = "proto3";
+
+package carpathians.catalog.v1;
+
+option csharp_namespace = "Carpathians.Catalog.Grpc";
+
+import "google/protobuf/wrappers.proto";
+import "common/types.proto";
+
+// Читання довідникових даних Каталогу. Відповіді кешуються (IMemoryCache L1 + Redis L2),
+// тому повторні виклики не звертаються до бази даних.
+service CatalogGrpc {
+  // Маршрут за ідентифікатором.
+  // INVALID_ARGUMENT — id <= 0; NOT_FOUND — маршрут не існує або видалений.
+  rpc GetRoute (GetRouteRequest) returns (RouteReply);
+
+  // Кілька маршрутів одним викликом (Aggregator). Ідентифікатори, яких немає, у відповіді пропускаються.
+  // INVALID_ARGUMENT — порожній список, більше 100 id або id <= 0.
+  rpc GetRoutesByIds (GetRoutesByIdsRequest) returns (RoutesReply);
+
+  // Довідник регіонів.
+  rpc ListRegions (ListRegionsRequest) returns (RegionsReply);
+}
+
+message GetRouteRequest {
+  int64 id = 1;
+}
+
+message GetRoutesByIdsRequest {
+  repeated int64 ids = 1;
+}
+
+message ListRegionsRequest {
+}
+
+// Складність маршруту. Нульове значення proto3 — «не задано».
+enum RouteDifficulty {
+  ROUTE_DIFFICULTY_UNSPECIFIED = 0;
+  ROUTE_DIFFICULTY_EASY = 1;
+  ROUTE_DIFFICULTY_MODERATE = 2;
+  ROUTE_DIFFICULTY_HARD = 3;
+}
+
+// Опис маршруту (1:1). Необов'язкові рядки й числа — wrapper-типи (null у C#).
+message RouteDetail {
+  string description = 1;
+  google.protobuf.StringValue season = 2;
+  google.protobuf.Int32Value max_altitude_m = 3;
+  google.protobuf.StringValue start_point = 4;
+  google.protobuf.StringValue requirements = 5;
+}
+
+message RouteReply {
+  int64 id = 1;
+  int32 region_id = 2;
+  string region_name = 3;
+  string name = 4;
+  string slug = 5;
+  RouteDifficulty difficulty = 6;
+  carpathians.common.v1.DecimalValue distance_km = 7;
+  carpathians.common.v1.DecimalValue duration_hours = 8;
+  int32 elevation_gain_m = 9;
+  // Відсутній, якщо опис маршруту ще не задано.
+  RouteDetail detail = 10;
+  // Кількість точок (вершини, притулки) на маршруті.
+  int32 points_count = 11;
+}
+
+message RoutesReply {
+  repeated RouteReply routes = 1;
+}
+
+message RegionReply {
+  int32 id = 1;
+  string name = 2;
+  google.protobuf.StringValue description = 3;
+}
+
+message RegionsReply {
+  repeated RegionReply regions = 1;
+}

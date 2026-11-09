@@ -14,4 +14,24 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
+  <!-- Лаб. 06: gRPC-клієнти з DI (HttpClientFactory), генерація коду з .proto, Redis для агрегованих відповідей -->
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.76.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.31.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.76.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="9.5.2" />
+  </ItemGroup>
+
+  <!-- Ті самі .proto, що й у сервісах (одне джерело контракту), — лише клієнтська частина -->
+  <ItemGroup>
+    <Protobuf Include="..\Protos\common\types.proto" GrpcServices="None" ProtoRoot="..\Protos" Link="Protos\common\types.proto" />
+    <Protobuf Include="..\..\booking-service\Carpathians.Booking.Api\Protos\booking.proto" GrpcServices="Client" AdditionalImportDirs="..\Protos" Link="Protos\booking.proto" />
+    <Protobuf Include="..\..\catalog-service\Carpathians.Catalog.Api\Protos\catalog.proto" GrpcServices="Client" AdditionalImportDirs="..\Protos" Link="Protos\catalog.proto" />
+    <Protobuf Include="..\..\reviews-service\Carpathians.Reviews.WebApi\Protos\reviews.proto" GrpcServices="Client" Link="Protos\reviews.proto" />
+    <Compile Include="..\Protos\common\DecimalValue.cs" Link="Protos\common\DecimalValue.cs" />
+  </ItemGroup>
+
 </Project>

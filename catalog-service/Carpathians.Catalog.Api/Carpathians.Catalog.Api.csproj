@@ -17,6 +17,20 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
   </ItemGroup>
 
+  <!-- Лаб. 06: кеш у пам'яті (L1), Redis через Aspire (L2), gRPC-сервер -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+    <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="9.5.2" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
+  </ItemGroup>
+
+  <!-- gRPC-контракт Каталогу (серверна частина) + спільні типи платформи (DecimalValue) -->
+  <ItemGroup>
+    <Protobuf Include="Protos\catalog.proto" GrpcServices="Server" AdditionalImportDirs="..\..\platform\Protos" />
+    <Protobuf Include="..\..\platform\Protos\common\types.proto" GrpcServices="None" ProtoRoot="..\..\platform\Protos" Link="Protos\common\types.proto" />
+    <Compile Include="..\..\platform\Protos\common\DecimalValue.cs" Link="Protos\common\DecimalValue.cs" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>

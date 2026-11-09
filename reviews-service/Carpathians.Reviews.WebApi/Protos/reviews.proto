@@ -1,0 +1,65 @@
+// gRPC-контракт сервісу відгуків (Лаб. 04) для внутрішніх викликів платформи.
+// Сервер — Carpathians.Reviews.WebApi (GrpcServices="Server"), клієнт — Aggregator (GrpcServices="Client").
+// Номери полів після публікації не змінюються: саме вони визначають бінарний формат повідомлення.
+
+syntax = "proto3";
+
+package carpathians.reviews.v1;
+
+option csharp_namespace = "Carpathians.Reviews.Grpc";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+// Рейтинги й відгуки маршрутів (для Aggregator).
+service ReviewsGrpc {
+  // Зведений рейтинг маршруту.
+  // INVALID_ARGUMENT — route_id <= 0; NOT_FOUND — маршрут ще не має відгуків.
+  rpc GetRouteRating (GetRouteRatingRequest) returns (RouteRatingReply);
+
+  // Рейтинги кількох маршрутів одним викликом. Маршрути без відгуків у відповіді пропускаються.
+  rpc GetRatingsForRoutes (GetRatingsForRoutesRequest) returns (RouteRatingsReply);
+
+  // Найновіші відгуки маршруту (count від 1 до 20).
+  rpc GetLatestReviews (GetLatestReviewsRequest) returns (ReviewsReply);
+}
+
+message GetRouteRatingRequest {
+  int64 route_id = 1;
+}
+
+message GetRatingsForRoutesRequest {
+  repeated int64 route_ids = 1;
+}
+
+message RouteRatingReply {
+  int64 route_id = 1;
+  google.protobuf.StringValue route_name = 2;
+  double avg_rating = 3;
+  int32 reviews_count = 4;
+  // Розподіл оцінок: "1".."5" -> кількість відгуків.
+  map<string, int32> distribution = 5;
+}
+
+message RouteRatingsReply {
+  repeated RouteRatingReply ratings = 1;
+}
+
+message GetLatestReviewsRequest {
+  int64 route_id = 1;
+  int32 count = 2;
+}
+
+message ReviewReply {
+  string id = 1;
+  int64 route_id = 2;
+  string author_name = 3;
+  int32 rating = 4;
+  string text = 5;
+  int32 comments_count = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ReviewsReply {
+  repeated ReviewReply reviews = 1;
+}

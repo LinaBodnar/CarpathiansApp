@@ -22,4 +22,16 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
   </ItemGroup>
 
+  <!-- Лаб. 06: кеш у пам'яті (L1), Redis через Aspire (L2), gRPC-сервер -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+    <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="9.5.2" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
+  </ItemGroup>
+
+  <!-- gRPC-контракт відгуків (серверна частина) -->
+  <ItemGroup>
+    <Protobuf Include="Protos\reviews.proto" GrpcServices="Server" />
+  </ItemGroup>
+
 </Project>
