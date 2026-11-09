@@ -30,6 +30,7 @@ carpathians-databases/
 ├── catalog-db/
 │   ├── schema.sql
 │   └── seed.sql
+├── platform/                   # Проєкт №5 — .NET Aspire: AppHost, ServiceDefaults, Gateway, Aggregator
 ├── reviews-service/            # Проєкт №3 — сервіс відгуків (Clean Architecture + CQRS + MongoDB)
 ├── reviews-db/
 │   ├── init.js                 # колекції, JSON Schema, індекси
@@ -505,3 +506,18 @@ dotnet run
 ```
 
 Swagger UI: `http://localhost:5203/swagger`. Індекси та початкові дані створюються автоматично під час старту.
+
+## Проєкт №5 — Платформа на .NET Aspire
+
+Сервіси з Лаб. 02–04 інтегровано в єдину платформу (тека `platform/`): **AppHost** запускає контейнери
+SQL Server і MongoDB, три сервіси, Aggregator і Gateway однією командою; **ServiceDefaults** дає всім
+сервісам однакове структуроване логування (Serilog → Aspire Dashboard), трасування OpenTelemetry
+(HTTP, SQL Server, MongoDB) і наскрізний `X-Correlation-Id`; **API Gateway** на YARP — єдина точка
+входу `http://localhost:5000`; **Aggregator** паралельно збирає картку бронювання з трьох сервісів
+і повертає часткову відповідь, якщо один із них недоступний. Повний опис —
+[`platform/README.md`](platform/README.md).
+
+```powershell
+dotnet user-secrets set "Parameters:sql-password" "YourStrong!Passw0rd" --project platform/Carpathians.Platform.AppHost
+dotnet run --project platform/Carpathians.Platform.AppHost
+```
