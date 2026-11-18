@@ -176,5 +176,7 @@ app.MapGrpcService<CatalogGrpcService>();          // gRPC: carpathians.catalog.
 app.MapGrpcHealthChecksService();                  // gRPC: grpc.health.v1.Health (Check/Watch) — для Aggregator
 if (app.Environment.IsDevelopment())
     app.MapGrpcReflectionService();               // опис сервісів для Postman/grpcurl
+if (app.Environment.IsDevelopment())
+    app.MapOutboxDevEndpoints();                  // /dev/outbox: перегляд outbox і повторна публікація події (Лаб. 08)
 app.MapDefaultEndpoints();
 app.Run();

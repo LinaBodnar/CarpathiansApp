@@ -752,3 +752,175 @@ curl.exe -k https://localhost:7047/health/ready   # -> 503, "booking-db": Unheal
 
 Порти сервісів (профіль `https`): booking-api `7047`, catalog-api `7052`, reviews-api `7203`, aggregator `5110`,
 gateway `5000`. Точні адреси показує Dashboard → Resources.
+
+## Проєкт №8 — Асинхронна подієва інтеграція (RabbitMQ)
+
+Каталог — власник маршрутів. Політика дублювання (розділ 9) вимагає оновлювати копії назви маршруту подіями:
+`RouteRefs` у БД Бронювання і `routeName` у відгуках та обговореннях. Каталог публікує integration event
+у RabbitMQ, а Бронювання й Відгуки отримують його у власних чергах і оновлюють свої копії (eventual consistency).
+
+| Що | Де |
+|---|---|
+| RabbitMQ (volume, Management UI на `15672`) | `Platform.AppHost/AppHost.cs` |
+| Підключення (`Aspire.RabbitMQ.Client.v7`, `RabbitMQ.Client` 7.x), health check | `Platform.EventBus/EventBusExtensions.cs` |
+| Топологія: exchanges, черги, bindings, DLX/DLQ, черги повторів | `Platform.EventBus/Topology/` |
+| Базова подія, JSON, заголовки | `Platform.EventBus/Events/`, `Platform.EventBus/Messaging/` |
+| Publisher (`IEventPublisher`, `RabbitMqEventPublisher`) | `Platform.EventBus/Publishing/` |
+| Consumer (`BackgroundService`, ack/nack, retry, DLQ) | `Platform.EventBus/Consuming/` |
+| Трасування через брокер, метрики | `Platform.EventBus/Diagnostics/`, `Platform.ServiceDefaults/Extensions.cs` |
+| Події Каталогу, outbox, фонова публікація | `Services/Catalog/Carpathians.Catalog.Api/IntegrationEvents/`, `Carpathians.Catalog.Dal/Outbox/` |
+| Публікація після збереження | `Services/Catalog/Carpathians.Catalog.Bll/Services/RouteService.cs` |
+| Обробники Бронювання, `ProcessedEvents` | `Services/Booking/Carpathians.Booking.Api/IntegrationEvents/`, `Carpathians.Booking.Dal/Migrations/` |
+| Обробник Відгуків, `processedEvents` | `Services/Reviews/Carpathians.Reviews.WebApi/IntegrationEvents/`, `Carpathians.Reviews.Infrastructure/Persistence/IntegrationEventStore.cs` |
+
+### 1. Топологія
+
+```
+                                  route.*         ┌─> booking.catalog-sync ──nack──┐
+Catalog ──publish──> catalog-events (topic) ──────┤        ▲                       │
+                                  route.renamed   └─> reviews.catalog-sync ─nack─┐ │
+                                                           ▲                     │ │
+                                                  *.retry (TTL 5 с)              ▼ ▼
+                                                                    catalog-events.dlx (direct)
+                                                                     ├─> booking.catalog-sync.dlq
+                                                                     └─> reviews.catalog-sync.dlq
+```
+
+- `catalog-events` — durable topic exchange. Routing keys: `route.created`, `route.renamed`, `route.deleted`.
+- Кожен сервіс-споживач має власну durable-чергу (fan-out між сервісами). Кілька екземплярів одного сервісу
+  читають ту саму чергу — competing consumers.
+  - `booking.catalog-sync` має binding `route.*` (`*` — рівно одне слово), бо Бронюванню потрібен повний довідник.
+  - `reviews.catalog-sync` має binding лише `route.renamed`, бо Відгукам потрібна тільки назва.
+- DLX має тип `direct`, ключ дорівнює назві черги-джерела (`x-dead-letter-routing-key`). Відхилене повідомлення
+  потрапляє лише в DLQ своєї черги. З `fanout` воно опинилося б у DLQ усіх споживачів.
+- Черга `<черга>.retry` не має споживачів. Через `x-message-ttl` (5 с) RabbitMQ повертає повідомлення в основну
+  чергу, тож між повторами є затримка без блокування споживача.
+- Топологію оголошують у коді під час старту: publisher оголошує свій exchange, кожен consumer — свої черги.
+  Повторне оголошення безпечне. Параметри черг через Management UI не змінюються, інакше буде `PRECONDITION_FAILED`.
+
+### 2. Події та публікація
+
+| Подія | Routing key | Дані | Споживачі |
+|---|---|---|---|
+| `RouteCreatedIntegrationEvent` | `route.created` | `routeId`, `name`, `slug`, `regionId`, `difficulty` | Бронювання |
+| `RouteRenamedIntegrationEvent` | `route.renamed` | `routeId`, `oldName`, `newName` | Бронювання, Відгуки |
+| `RouteDeletedIntegrationEvent` | `route.deleted` | `routeId`, `name` | Бронювання |
+
+- Усі події — незмінні `record` з базовим `IntegrationEvent`: `EventId` (ключ ідемпотентності), `OccurredAt`,
+  `CorrelationId`. Кожна подія самодостатня, споживач не звертається до Каталогу по додаткові дані.
+- Кожен сервіс має власну копію record-а, як в eShop. Контракт — JSON, а не спільна збірка.
+- Формат: System.Text.Json, camelCase, enum рядком, дати ISO 8601 UTC. Невідомі поля ігноруються.
+  Сумісні зміни схеми лише додають поля. Несумісна зміна — нова версія (`x-event-version`).
+- Метадані повідомлення:
+  - `Persistent`, `ContentType = application/json`, `MessageId = EventId`, `Type` = тип події, `Timestamp`;
+  - заголовки `x-correlation-id`, `x-event-version`, `x-source`, `traceparent`.
+- Канал публікації працює з publisher confirms: подія вважається опублікованою після підтвердження брокера.
+
+**Публікація лише після збереження + Transactional Outbox.** `RouteService` створює, перейменовує й видаляє
+маршрут так:
+
+1. Зміни маршруту і запис події в таблицю `IntegrationEventLog` виконуються в одній транзакції БД.
+2. Після коміту подія публікується, запис отримує стан `Published`.
+3. Транзакція не вдалася — немає ні змін, ні події.
+4. Брокер недоступний або сервіс упав після коміту — подія лишається в outbox. `CatalogOutboxPublisher`
+   кожні 10 с допублікує її і продовжить trace початкового запиту.
+
+Зміна лише дистанції чи складності подію не породжує: копії тримають тільки назву.
+
+### 3. Споживання, ідемпотентність, реплікація
+
+`RabbitMqEventConsumer` — це `BackgroundService` на кожну чергу. Він працює так:
+
+- створює канал, оголошує топологію, ставить `BasicQos(prefetch: 10)`;
+- підписується через `AsyncEventingBasicConsumer` і `BasicConsumeAsync(autoAck: false)`;
+- за `stoppingToken` скасовує споживача й закриває канал.
+
+Обробник обирається за `BasicProperties.Type`. Кожен тип події має окремий клас-обробник, він створюється
+в DI-scope повідомлення.
+
+| Результат обробки | Дія |
+|---|---|
+| Успіх | `BasicAckAsync` |
+| Тимчасовий збій (БД недоступна, таймаут) | копія з `x-retry-count + 1` і `x-last-error` → `<черга>.retry`, ack оригіналу |
+| Вичерпано 3 повтори | `BasicNackAsync(requeue: false)` → DLX → DLQ |
+| Постійний збій: некоректний JSON, невідомий тип, несумісна версія, некоректні дані | одразу `BasicNackAsync(requeue: false)` → DLQ |
+
+Повторно публікується копія, а не `requeue`, бо при `requeue` повідомлення повертається без змін і лічильник
+спроб не збільшити.
+
+**Бронювання (SQL Server, Dapper):**
+
+- В одній транзакції виконується `INSERT dbo.ProcessedEvents (EventId)` і `MERGE dbo.RouteRefs`.
+- Порушення PRIMARY KEY (помилка 2627) означає, що подію вже оброблено: відкат і пропуск.
+- `RouteRefs.CatalogChangedAt` зберігає час останньої застосованої події. Старша подія, що прийшла пізніше
+  (out-of-order), новіші дані не перезапише.
+- `route.deleted` не видаляє рядок (на нього посилаються виїзди), а ставить `IsActive = 0`.
+- Знімки в оформлених бронюваннях (`BookingItems.RouteName`, `BookingItems.UnitPrice`) не змінюються.
+- Таблицю `ProcessedEvents` і нові стовпці `RouteRefs` створює `Dal/Migrations/001_IntegrationEvents.sql`
+  під час старту сервісу (ідемпотентно). Також вони є в `db/p1/schema.sql`.
+
+**Відгуки (MongoDB):**
+
+- `RouteRenamedHandler` виконує наявну CQRS-команду `SyncRouteNameCommand`: `UpdateMany` по `reviews.routeName`
+  і `discussions.routeName`, інвалідація кешу маршруту.
+- `processedEvents` (`_id = EventId`) — ідемпотентність, `routeNameSync` (`_id = routeId`, `changedAt`) — out-of-order.
+- MongoDB платформи працює без replica set, тому багатодокументних транзакцій немає. Безпеку забезпечує порядок
+  кроків: перевірка `EventId` → оновлення назви (`$set` тим самим значенням нічого не змінює вдруге) → запис
+  `EventId`. Збій між кроками призведе лише до повторної обробки з тим самим результатом.
+
+### 4. Трасування і логування
+
+- Publisher створює span `catalog-events publish` (Producer) і записує його контекст у заголовок `traceparent`
+  (W3C, пропагатор OpenTelemetry).
+- Consumer витягує контекст із заголовків (значення `byte[]`) і створює span `<черга> process` (Consumer) як нащадка.
+  Теги: `messaging.system`, `messaging.destination.name`, `messaging.message.id`, `messaging.message.type`.
+- ActivitySource і Meter `Platform.Messaging` підключено в ServiceDefaults. Вбудоване трасування клієнта вимкнено
+  (`DisableTracing`), щоб spans не дублювалися.
+- Один trace: `PUT /api/routes/{id}` → SQL Каталогу → `catalog-events publish` → `booking.catalog-sync process`
+  → SQL Бронювання і `reviews.catalog-sync process` → MongoDB.
+- Логи обробки й збоїв містять `EventId`, `EventType`, `CorrelationId`, `Queue`, `RetryCount` та ідентифікатори
+  маршруту. Винятки логуються з повним stack trace.
+- Метрики (Meter `Platform.Messaging`):
+  - `messaging.process.messages` з тегом `outcome` (`ack` / `retry` / `dead_letter`);
+  - `messaging.process.duration`;
+  - `messaging.queue.depth` — глибина основних черг, черг повторів і DLQ.
+
+### 5. Сценарії перевірки
+
+Management UI: `http://localhost:15672`. Логін — `guest`, пароль — параметр `messaging-password`
+(Dashboard → Resources → messaging, або user-secrets AppHost). Запити — у `Services/Catalog/Carpathians.Catalog.Api/Carpathians.Catalog.Api.http`.
+
+1. **Топологія.** Management UI → Exchanges: `catalog-events`, `catalog-events.dlx`. Queues:
+   `booking.catalog-sync`, `reviews.catalog-sync` та їхні `.retry` і `.dlq`. У черзі → Bindings.
+2. **Перейменування.** `PUT https://localhost:7052/api/routes/1` з новою назвою (запит 1 у `.http`).
+   За кілька секунд оновлюються копії:
+   - `SELECT Id, Name, CatalogChangedAt, IsActive FROM dbo.RouteRefs WHERE Id = 1` (BookingContext) — нова назва;
+   - `SELECT TOP 5 * FROM dbo.ProcessedEvents ORDER BY ProcessedAt DESC` — EventId події;
+   - `SELECT RouteName, UnitPrice FROM dbo.BookingItems` — без змін (знімки);
+   - `GET https://localhost:7203/api/reviews?routeId=1` — нова `routeName` в усіх відгуках.
+3. **Дублікат.** `GET /dev/outbox` → `eventId` останньої події, потім `POST /dev/outbox/{eventId}/republish`.
+   У Structured logs booking-api і reviews-api з'являється «Duplicate RouteRenamedIntegrationEvent ... skipped»,
+   дані не змінюються.
+4. **Обробка після перезапуску.** Зупиніть booking-api у Dashboard і перейменуйте маршрут кілька разів.
+   Повідомлення чекають у `booking.catalog-sync`. Після запуску booking-api їх оброблено всі, Ready = 0.
+5. **Некоректний JSON → DLQ.** Management UI → Queues → `booking.catalog-sync` → Publish message:
+   property `type = RouteRenamedIntegrationEvent`, payload `{not json`. У лозі — «Permanent failure ... Sending
+   to DLQ», повідомлення лежить у `booking.catalog-sync.dlq` із заголовком `x-death`.
+6. **Повтори.** Зупиніть `sql` у Dashboard і опублікуйте коректну подію в `booking.catalog-sync` через
+   Management UI (тіло нижче). У логах буде «Retry 1/3 … 2/3 … 3/3» з інтервалом 5 с, потім «failed after
+   3 retries, sending to DLQ». Якщо запустити `sql` раніше, подія обробиться з наступної спроби.
+
+Тіло для ручної публікації, property `type = RouteRenamedIntegrationEvent`:
+
+```json
+{"eventId":"7d1c3a52-1111-4a8e-9f00-000000000001","occurredAt":"2026-11-18T12:00:00Z","correlationId":"manual-1",
+ "routeId":1,"oldName":"Заросляк – Говерла","newName":"Заросляк – Говерла (ручна подія)"}
+```
+
+**Aspire Dashboard:**
+
+- Traces: фільтр `catalog-api`, запит `PUT api/routes/{id}`. Один trace містить publish, process в обох сервісах
+  і запити до БД. Між publish і process є невеликий проміжок — це eventual consistency.
+- Structured logs: фільтр за `CorrelationId` запиту показує ланцюжок у трьох сервісах.
+- Metrics → `Platform.Messaging`: `messaging.process.messages` за `outcome`, `messaging.queue.depth` для `*.dlq`.
+- Resources: стан `messaging`. Health check RabbitMQ входить у `/health/ready` сервісів.

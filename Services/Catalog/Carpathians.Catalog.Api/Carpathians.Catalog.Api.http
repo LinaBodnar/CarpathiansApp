@@ -4,3 +4,40 @@ GET {{Carpathians.Catalog.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+### ---------- Лаб. 08: події Каталогу (RabbitMQ) ----------
+@CatalogHttps = https://localhost:7052
+
+### 1. Перейменування маршруту -> route.renamed -> RouteRefs (Бронювання) і routeName у відгуках
+PUT {{CatalogHttps}}/api/routes/1
+Content-Type: application/json
+X-Correlation-Id: lab08-rename-1
+
+{
+  "name": "Заросляк – Говерла (2061 м)",
+  "difficulty": 1,
+  "distanceKm": 12.0,
+  "durationHours": 6.5,
+  "elevationGainM": 1000,
+  "updatedBy": "lab08"
+}
+
+### 2. Outbox: останні події (EventId, стан Published, кількість відправлень)
+GET {{CatalogHttps}}/dev/outbox
+
+### 3. Дублікат: та сама подія (той самий EventId) ще раз -> у логах "Duplicate ... skipped"
+POST {{CatalogHttps}}/dev/outbox/00000000-0000-0000-0000-000000000000/republish
+
+### 4. Повернути назву
+PUT {{CatalogHttps}}/api/routes/1
+Content-Type: application/json
+X-Correlation-Id: lab08-rename-2
+
+{
+  "name": "Заросляк – Говерла",
+  "difficulty": 1,
+  "distanceKm": 12.0,
+  "durationHours": 6.5,
+  "elevationGainM": 1000,
+  "updatedBy": "lab08"
+}
