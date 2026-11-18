@@ -28,6 +28,8 @@ builder.AddServiceDefaults();
 
 // Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
 builder.AddPlatformAuthentication();
+// Лаб. 09: політики permissions і scopes (gRPC для Aggregator — scope reviews.read)
+builder.AddPermissionAuthorization();
 
 // Aspire передає рядок підключення як ConnectionStrings:ReviewsDb (з іменем бази в URL);
 // без Aspire використовується секція MongoDb з appsettings.json.

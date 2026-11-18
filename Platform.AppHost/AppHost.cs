@@ -63,6 +63,36 @@ var auth = builder.AddProject<Projects.Carpathians_Auth_Api>("auth-api", launchP
     .WithEnvironment("Auth__Admin__Password", adminPassword)
     .WithHttpHealthCheck("/health");
 
+// ---------- Duende IdentityServer (Лаб. 09, частина 2): OAuth 2.0 / OpenID Connect ----------
+
+// Окремий SQL Server для IdentityServer: конфігурація (clients, scopes, resources), operational data (grants, keys)
+// і користувачі ASP.NET Identity. Паролі генеруються один раз і зберігаються в user-secrets AppHost (persist).
+var identityServerSqlPassword = builder.AddParameter("identityserver-sql-password",
+    new GenerateParameterDefault { MinLength = 20, Special = false, MinLower = 2, MinUpper = 2, MinNumeric = 2 },
+    secret: true, persist: true);
+var identityServerDb = builder.AddSqlServer("identityserver-sql", identityServerSqlPassword)
+    .WithDataVolume("carpathians-identityserver-sql-data")
+    .AddDatabase("IdentityServerDb");
+
+// Секрет клієнта aggregator_service (Client Credentials) — той самий отримують IdentityServer і Aggregator.
+var aggregatorClientSecret = builder.AddParameter("aggregator-client-secret",
+    new GenerateParameterDefault { MinLength = 32, Special = false }, secret: true, persist: true);
+
+// Пароль тестових користувачів alice (admin), bob (manager), carol (user), dave (guest) — у Dashboard: Parameters.
+var testUsersPassword = builder.AddParameter("identityserver-test-password",
+    new GenerateParameterDefault { MinLength = 16, Special = false, MinLower = 2, MinUpper = 2, MinNumeric = 2 },
+    secret: true, persist: true);
+
+var identityServer = builder.AddProject<Projects.Carpathians_Platform_IdentityServer>("identityserver", launchProfileName: "https")
+    .WithReference(identityServerDb)
+    .WaitFor(identityServerDb)
+    .WithEnvironment("Clients__AggregatorSecret", aggregatorClientSecret)
+    .WithEnvironment("TestUsers__Password", testUsersPassword)
+    .WithHttpHealthCheck("/health");
+
+// Issuer токенів IdentityServer = його HTTPS-адреса; сервіси завантажують ключі з discovery document.
+var identityServerAuthority = identityServer.GetEndpoint("https");
+
 // ---------- Мікросервіси (ім'я ресурсу = логічне ім'я для service discovery) ----------
 // Jwt__SecretKey (Лаб. 09): кожен сервіс перевіряє JWT сам, без звернення до Auth Service.
 // WithHttpHealthCheck("/health") (Лаб. 07): Dashboard показує стан кожного ресурсу (Healthy / Degraded / Unhealthy)
@@ -79,6 +109,8 @@ var booking = builder.AddProject<Projects.Carpathians_Booking_Api>("booking-api"
     .WithReference(messaging)       // споживає події Каталогу: довідник RouteRefs
     .WaitFor(messaging)
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
+    .WithEnvironment("IdentityServer__Audience", "booking-api")
     .WithHttpHealthCheck("/health");
 
 var catalog = builder.AddProject<Projects.Carpathians_Catalog_Api>("catalog-api", launchProfileName: "https")
@@ -89,6 +121,8 @@ var catalog = builder.AddProject<Projects.Carpathians_Catalog_Api>("catalog-api"
     .WithReference(messaging)       // публікує події про маршрути (catalog-events)
     .WaitFor(messaging)
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
+    .WithEnvironment("IdentityServer__Audience", "catalog-api")
     .WithHttpHealthCheck("/health");
 
 var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-api", launchProfileName: "https")
@@ -99,11 +133,15 @@ var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-a
     .WithReference(messaging)       // споживає події Каталогу: routeName у відгуках і обговореннях
     .WaitFor(messaging)
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
+    .WithEnvironment("IdentityServer__Audience", "reviews-api")
     .WithHttpHealthCheck("/health");
 
 // Платежі (Лаб. 09): демо-сервіс для перевірки доступу — усі endpoints лише для admin.
 var payments = builder.AddProject<Projects.Carpathians_Payments_Api>("payments-api", launchProfileName: "https")
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
+    .WithEnvironment("IdentityServer__Audience", "payments-api")
     .WithHttpHealthCheck("/health");
 
 // ---------- Aggregator: паралельні gRPC-виклики мікросервісів + кеш агрегованих відповідей у Redis ----------
@@ -118,6 +156,10 @@ var aggregator = builder.AddProject<Projects.Carpathians_Platform_Aggregator>("a
     .WithReference(redis)
     .WaitFor(redis)
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
+    .WithEnvironment("IdentityServer__Audience", "booking-api,catalog-api,reviews-api")
+    .WithEnvironment("Clients__AggregatorSecret", aggregatorClientSecret)   // Client Credentials -> gRPC мікросервісів
+    .WaitFor(identityServer)
     .WithHttpHealthCheck("/health");
 
 // ---------- API Gateway: єдина точка входу, фіксований порт 5000 ----------
@@ -134,6 +176,8 @@ builder.AddProject<Projects.Carpathians_Platform_ApiGateway>("gateway")
     .WaitFor(auth)
     .WaitFor(aggregator)
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
+    .WithEnvironment("IdentityServer__Audience", "booking-api,catalog-api,payments-api,reviews-api")
     .WithHttpHealthCheck("/health");
 
 builder.Build().Run();

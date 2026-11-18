@@ -3,6 +3,8 @@ using Carpathians.Bll.Interfaces;
 using Carpathians.Catalog.Grpc;
 using Carpathians.Domain.Exceptions;
 using Grpc.Core;
+using Carpathians.Platform.ServiceDefaults.Security;
+using Microsoft.AspNetCore.Authorization;
 using DomainDifficulty = Carpathians.Domain.Enums.Difficulty;
 
 namespace Carpathians.Catalog.Api.Grpc;
@@ -13,7 +15,10 @@ namespace Carpathians.Catalog.Api.Grpc;
 /// тобто через декоратори з дворівневим кешем — повторні виклики не звертаються до бази.
 /// <para>Помилки: некоректний запит — INVALID_ARGUMENT тут; доменні винятки (EntityNotFoundException -> NOT_FOUND)
 /// перетворює <see cref="CatalogGrpcExceptionInterceptor"/>.</para>
+/// <para>Лаб. 09: доступ лише з access token IdentityServer зі scope <c>routes.read</c>
+/// (Aggregator отримує його через Client Credentials, клієнт aggregator_service).</para>
 /// </summary>
+[Authorize(Policy = ScopePolicies.RoutesRead)]
 public sealed class CatalogGrpcService(IRouteService routes, IRegionService regions) : CatalogGrpc.CatalogGrpcBase
 {
     /// <summary>Максимум ідентифікаторів в одному пакетному запиті.</summary>

@@ -68,6 +68,9 @@ public static class PlatformAuthentication
     /// <summary>Токени власного Auth Service (ASP.NET Identity + JWT, симетричний ключ).</summary>
     public const string AuthServiceScheme = "AuthService";
 
+    /// <summary>Токени Duende IdentityServer (OAuth 2.0 / OIDC): ключі — з discovery document Authority.</summary>
+    public const string IdentityServerScheme = "IdentityServer";
+
     /// <summary>Реєструє автентифікацію JWT та авторизацію. Викликати в Program.cs сервісу після AddServiceDefaults().</summary>
     public static TBuilder AddPlatformAuthentication<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
@@ -101,8 +104,43 @@ public static class PlatformAuthentication
                 options.TokenValidationParameters = CreateValidationParameters(settings);
             });
 
+        builder.AddIdentityServerJwtBearer();
+
         builder.Services.AddAuthorization();
         return builder;
+    }
+
+    /// <summary>
+    /// Токени IdentityServer (частина 2): Authority = адреса IdentityServer (IdentityServer:Authority від AppHost),
+    /// Audience = API resource сервісу (IdentityServer:Audience; кілька — через кому, напр. у Gateway).
+    /// Ключі підпису завантажуються з /.well-known/openid-configuration; перевірка — локальна.
+    /// </summary>
+    private static void AddIdentityServerJwtBearer(this IHostApplicationBuilder builder)
+    {
+        var authority = builder.Configuration["IdentityServer:Authority"]?.TrimEnd('/');
+        if (string.IsNullOrEmpty(authority))
+            return;                                        // сервіс запущено без IdentityServer
+
+        var audiences = (builder.Configuration["IdentityServer:Audience"] ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var isDevelopment = builder.Environment.IsDevelopment();
+
+        builder.Services.AddAuthentication()
+            .AddJwtBearer(IdentityServerScheme, options =>
+            {
+                options.Authority = authority;
+                options.MapInboundClaims = false;
+                options.TokenValidationParameters.ValidateAudience = audiences.Length > 0;
+                options.TokenValidationParameters.ValidAudiences = audiences;
+                options.TokenValidationParameters.NameClaimType = "name";
+                options.TokenValidationParameters.RoleClaimType = PlatformClaimTypes.Role;
+                options.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
+                if (isDevelopment)
+                    options.BackchannelHttpHandler = DevelopmentCertificates.CreateHandler();
+            });
+
+        builder.Services.AddIssuerScheme(IdentityServerScheme,
+            issuer => string.Equals(issuer.TrimEnd('/'), authority, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Middleware автентифікації й авторизації (після UseRouting / UseExceptionHandler, до Map*).</summary>

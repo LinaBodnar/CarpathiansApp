@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Carpathians.Platform.IdentityServer</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Лаб. 09, частина 2: Duende IdentityServer (OAuth 2.0 / OpenID Connect) з ASP.NET Identity та EF-сховищами.
+    Ліцензія: без ключа працює в режимі розробки; для навчання достатньо Community Edition.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Duende.IdentityServer" Version="7.2.0" />
+    <PackageReference Include="Duende.IdentityServer.AspNetIdentity" Version="7.2.0" />
+    <PackageReference Include="Duende.IdentityServer.EntityFramework" Version="7.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Platform.ServiceDefaults\Carpathians.Platform.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

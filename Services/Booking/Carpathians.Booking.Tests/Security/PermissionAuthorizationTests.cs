@@ -82,6 +82,38 @@ public class PermissionAuthorizationTests
     }
 
     [Test]
+    public async Task Delegated_token_gets_intersection_of_scopes_and_user_role()
+    {
+        // Authorization Code: bob (manager) дозволив клієнту bookings.read + bookings.write
+        var bob = Principal(
+            new Claim(PermissionClaims.Scope, $"{ScopePermissionMap.BookingsRead} {ScopePermissionMap.BookingsWrite}"),
+            new Claim(PlatformClaimTypes.Role, PlatformRoleNames.Manager));
+
+        // scope є і роль дозволяє
+        Assert.That((await _authorization.AuthorizeAsync(bob, null, Permissions.Bookings.Approve)).Succeeded, Is.True);
+        // scope bookings.write є, але manager не має bookings:delete
+        Assert.That((await _authorization.AuthorizeAsync(bob, null, Permissions.Bookings.Delete)).Succeeded, Is.False);
+        // роль дозволяє routes:publish, але клієнт не отримав scope routes.write
+        Assert.That((await _authorization.AuthorizeAsync(bob, null, Permissions.Routes.Publish)).Succeeded, Is.False);
+    }
+
+    [Test]
+    public async Task Scope_policy_requires_exact_scope()
+    {
+        var services = new ServiceCollection().AddLogging();
+        services.AddAuthorization(options => options.AddPolicy(ScopePolicies.BookingsRead,
+            p => p.RequireAuthenticatedUser().RequireAssertion(c => c.User.HasScope(ScopePolicies.BookingsRead))));
+        using var provider = services.BuildServiceProvider();
+        var authorization = provider.GetRequiredService<IAuthorizationService>();
+
+        var aggregator = Principal(new Claim(PermissionClaims.Scope, "bookings.read routes.read reviews.read"));
+        var other = Principal(new Claim(PermissionClaims.Scope, ScopePermissionMap.RoutesRead));
+
+        Assert.That((await authorization.AuthorizeAsync(aggregator, null, ScopePolicies.BookingsRead)).Succeeded, Is.True);
+        Assert.That((await authorization.AuthorizeAsync(other, null, ScopePolicies.BookingsRead)).Succeeded, Is.False);
+    }
+
+    [Test]
     public async Task Anonymous_user_is_never_authorized()
     {
         var anonymous = new ClaimsPrincipal(new ClaimsIdentity());

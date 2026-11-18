@@ -101,6 +101,9 @@ public static class ScopePermissionMap
     public const string PaymentsRead = "payments.read";
     public const string PaymentsWrite = "payments.write";
 
+    /// <summary>Читання відгуків через gRPC (Aggregator); permissions для Відгуків не визначено — лише scope-політика.</summary>
+    public const string ReviewsRead = "reviews.read";
+
     public static readonly IReadOnlyDictionary<string, string[]> Permissions = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
         [BookingsRead] = [Security.Permissions.Bookings.Read],

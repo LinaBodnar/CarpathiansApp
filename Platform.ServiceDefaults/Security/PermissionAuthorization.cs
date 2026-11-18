@@ -56,7 +56,16 @@ public static class PermissionClaims
     public static bool HasPermission(this ClaimsPrincipal user, string permission)
         => user.Identity?.IsAuthenticated == true && user.GetPermissions().Contains(permission);
 
-    /// <summary>Усі permissions користувача з токена (Keycloak authorization, scopes IdentityServer, ролі Auth Service).</summary>
+    /// <summary>
+    /// Усі permissions з токена:
+    /// <list type="bullet">
+    /// <item>Keycloak — claim <c>authorization</c> (permissions уже обчислені Identity Provider за матрицею ролей);</item>
+    /// <item>токен лише зі scopes (Client Credentials, сервіс без користувача) — permissions scopes;</item>
+    /// <item>токен лише з ролями (Auth Service) — permissions ролей за матрицею;</item>
+    /// <item>делегований токен користувача (IdentityServer, Authorization Code): і scopes, і ролі —
+    /// ПЕРЕТИН: клієнт не отримає більше, ніж дозволено користувачу, і більше, ніж дозволяють scopes.</item>
+    /// </list>
+    /// </summary>
     public static IReadOnlySet<string> GetPermissions(this ClaimsPrincipal user)
     {
         var permissions = new HashSet<string>(StringComparer.Ordinal);
@@ -65,18 +74,30 @@ public static class PermissionClaims
         foreach (var claim in user.FindAll(Authorization))
             AddKeycloakPermissions(claim.Value, permissions);
 
-        // 2. IdentityServer: scope -> permissions
-        foreach (var claim in user.FindAll(Scope))
-            foreach (var scope in claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                if (ScopePermissionMap.Permissions.TryGetValue(scope, out var fromScope))
-                    permissions.UnionWith(fromScope);
+        // 2. IdentityServer: scope -> permissions (null — у токені немає жодного відомого scope)
+        HashSet<string>? fromScopes = null;
+        foreach (var scope in user.GetScopes())
+            if (ScopePermissionMap.Permissions.TryGetValue(scope, out var mapped))
+                (fromScopes ??= new HashSet<string>(StringComparer.Ordinal)).UnionWith(mapped);
 
-        // 3. Auth Service: роль (User/Admin) -> матриця ролей
+        // 3. Ролі (Auth Service: User/Admin; IdentityServer: admin/manager/user/guest) -> матриця
+        HashSet<string>? fromRoles = null;
         foreach (var claim in user.FindAll(PlatformClaimTypes.Role))
-            permissions.UnionWith(RolePermissionMatrix.For(claim.Value));
+            if (RolePermissionMatrix.Permissions.TryGetValue(claim.Value, out var mapped))
+                (fromRoles ??= new HashSet<string>(StringComparer.Ordinal)).UnionWith(mapped);
 
+        if (fromScopes is not null && fromRoles is not null)
+            fromScopes.IntersectWith(fromRoles);
+        permissions.UnionWith(fromScopes ?? fromRoles ?? []);
         return permissions;
     }
+
+    /// <summary>OAuth-scopes токена (масив claims "scope" або один рядок через пробіл).</summary>
+    public static IEnumerable<string> GetScopes(this ClaimsPrincipal user)
+        => user.FindAll(Scope).SelectMany(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+    public static bool HasScope(this ClaimsPrincipal user, string scope)
+        => user.Identity?.IsAuthenticated == true && user.GetScopes().Contains(scope, StringComparer.Ordinal);
 
     private static void AddKeycloakPermissions(string json, HashSet<string> permissions)
     {
@@ -99,6 +120,22 @@ public static class PermissionClaims
     }
 }
 
+/// <summary>Назви scope-політик: збігаються з назвами OAuth-scopes IdentityServer.</summary>
+public static class ScopePolicies
+{
+    public const string BookingsRead = ScopePermissionMap.BookingsRead;
+    public const string RoutesRead = ScopePermissionMap.RoutesRead;
+    public const string ReviewsRead = ScopePermissionMap.ReviewsRead;
+
+    public static readonly string[] All =
+    [
+        ScopePermissionMap.BookingsRead, ScopePermissionMap.BookingsWrite,
+        ScopePermissionMap.RoutesRead, ScopePermissionMap.RoutesWrite,
+        ScopePermissionMap.PaymentsRead, ScopePermissionMap.PaymentsWrite,
+        ScopePermissionMap.ReviewsRead
+    ];
+}
+
 /// <summary>Реєстрація permission-based авторизації в сервісі.</summary>
 public static class PermissionAuthorizationExtensions
 {
@@ -112,6 +149,12 @@ public static class PermissionAuthorizationExtensions
                 options.AddPolicy(permission, policy => policy
                     .RequireAuthenticatedUser()
                     .AddRequirements(new PermissionRequirement(permission)));
+
+            // Scope-based політики (IdentityServer): [Authorize(Policy = ScopePolicies.BookingsRead)] — напр. gRPC для Aggregator
+            foreach (var scope in ScopePolicies.All)
+                options.AddPolicy(scope, policy => policy
+                    .RequireAuthenticatedUser()
+                    .RequireAssertion(context => context.User.HasScope(scope)));
         });
         builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
         return builder;

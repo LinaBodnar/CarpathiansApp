@@ -1,3 +1,4 @@
+using Microsoft.OpenApi.Models;
 using Carpathians.Platform.ServiceDefaults.Security;
 using Carpathians.Api.Caching;
 using Carpathians.Api.Grpc;
@@ -101,7 +102,39 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Лаб. 09: Swagger UI з входом через IdentityServer — Authorization Code + PKCE (публічний клієнт "swagger", без секрету)
+var identityServerAuthority = builder.Configuration["IdentityServer:Authority"]?.TrimEnd('/');
+builder.Services.AddSwaggerGen(options =>
+{
+    if (string.IsNullOrEmpty(identityServerAuthority))
+        return;
+
+    options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.OAuth2,
+        Flows = new OpenApiOAuthFlows
+        {
+            AuthorizationCode = new OpenApiOAuthFlow
+            {
+                AuthorizationUrl = new Uri($"{identityServerAuthority}/connect/authorize"),
+                TokenUrl = new Uri($"{identityServerAuthority}/connect/token"),
+                Scopes = new Dictionary<string, string>
+                {
+                    ["openid"] = "Ідентифікатор користувача",
+                    ["profile"] = "Ім'я",
+                    ["roles"] = "Ролі",
+                    [ScopePermissionMap.BookingsRead] = "Перегляд бронювань",
+                    [ScopePermissionMap.BookingsWrite] = "Створення, зміна, видалення, підтвердження бронювань"
+                }
+            }
+        }
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "oauth2" } }] =
+            ["openid", "profile", "roles", ScopePermissionMap.BookingsRead, ScopePermissionMap.BookingsWrite]
+    });
+});
 
 var app = builder.Build();
 
@@ -120,7 +153,12 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.OAuthClientId("swagger");
+        options.OAuthUsePkce();                       // code_challenge (S256) замість client_secret
+        options.OAuthScopes("openid", "profile", "roles", ScopePermissionMap.BookingsRead, ScopePermissionMap.BookingsWrite);
+    });
 }
 
 app.UsePlatformAuthentication();

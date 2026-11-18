@@ -5,6 +5,7 @@
     <Project Path="Platform.ApiGateway/Carpathians.Platform.ApiGateway.csproj" />
     <Project Path="Platform.Aggregator/Carpathians.Platform.Aggregator.csproj" />
     <Project Path="Platform.EventBus/Carpathians.Platform.EventBus.csproj" />
+    <Project Path="Platform.IdentityServer/Carpathians.Platform.IdentityServer.csproj" />
   </Folder>
   <Folder Name="/Services/" />
   <Folder Name="/Services/Auth/">

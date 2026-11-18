@@ -10,10 +10,12 @@ using Carpathians.Platform.Aggregator.Grpc;
 using Carpathians.Platform.Aggregator.HealthChecks;
 using Carpathians.Platform.Aggregator.Metrics;
 using Carpathians.Platform.Aggregator.Resilience;
+using Carpathians.Platform.Aggregator.Security;
 using Carpathians.Platform.Aggregator.Services;
 using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Reviews.Grpc;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,19 +39,36 @@ builder.AddPermissionAuthorization();
 // Повтори за gRPC-статусами (UNAVAILABLE, RESOURCE_EXHAUSTED) — retry-політика каналу.
 builder.Services.AddSingleton<GrpcClientLoggingInterceptor>();
 
+// Лаб. 09, Client Credentials: gRPC-виклики мікросервісів — з access token Aggregator (клієнт aggregator_service),
+// а не користувача: мікросервіси перевіряють scopes bookings.read / routes.read / reviews.read.
+builder.Services.TryAddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(new ClientCredentialsOptions
+{
+    Authority = builder.Configuration["IdentityServer:Authority"],
+    ClientSecret = builder.Configuration["Clients:AggregatorSecret"]
+});
+builder.Services.AddHttpClient(ClientCredentialsTokenProvider.HttpClientName)
+    .ConfigurePrimaryHttpMessageHandler(() => builder.Environment.IsDevelopment()
+        ? DevelopmentCertificates.CreateHandler()
+        : new SocketsHttpHandler());
+builder.Services.AddSingleton<ClientCredentialsTokenProvider>();
+
 builder.Services.AddGrpcClient<BookingGrpc.BookingGrpcClient>(o => o.Address = new Uri("https://booking-api"))
     .AddInterceptor<GrpcClientLoggingInterceptor>()
     .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment))
+    .AddCallCredentials(AddServiceAccessTokenAsync)
     .AddDownstreamResilience(DownstreamPolicies.Booking, DownstreamTransport.Grpc)
     .AddGrpcRetryPolicy(DownstreamPolicies.Booking);
 builder.Services.AddGrpcClient<CatalogGrpc.CatalogGrpcClient>(o => o.Address = new Uri("https://catalog-api"))
     .AddInterceptor<GrpcClientLoggingInterceptor>()
     .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment))
+    .AddCallCredentials(AddServiceAccessTokenAsync)
     .AddDownstreamResilience(DownstreamPolicies.Catalog, DownstreamTransport.Grpc)
     .AddGrpcRetryPolicy(DownstreamPolicies.Catalog);
 builder.Services.AddGrpcClient<ReviewsGrpc.ReviewsGrpcClient>(o => o.Address = new Uri("https://reviews-api"))
     .AddInterceptor<GrpcClientLoggingInterceptor>()
     .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment))
+    .AddCallCredentials(AddServiceAccessTokenAsync)
     .AddDownstreamResilience(DownstreamPolicies.Reviews, DownstreamTransport.Grpc)
     .AddGrpcRetryPolicy(DownstreamPolicies.Reviews);
 
@@ -123,6 +142,14 @@ app.MapControllers();
 app.MapDefaultEndpoints();
 
 app.Run();
+
+// Bearer-токен Client Credentials у метаданих кожного gRPC-виклику (кешований — без зайвих звернень до IdentityServer).
+static async Task AddServiceAccessTokenAsync(Grpc.Core.AuthInterceptorContext context, Grpc.Core.Metadata metadata, IServiceProvider services)
+{
+    var token = await services.GetRequiredService<ClientCredentialsTokenProvider>().GetAccessTokenAsync(CancellationToken.None);
+    if (!string.IsNullOrEmpty(token))
+        metadata.Add("Authorization", $"Bearer {token}");
+}
 
 // HTTP/2-обробник gRPC-каналу: кілька HTTP/2-з'єднань при великій кількості паралельних викликів.
 // У Development довіряємо також сертифікату розробника ASP.NET Core (dotnet dev-certs), яким користуються

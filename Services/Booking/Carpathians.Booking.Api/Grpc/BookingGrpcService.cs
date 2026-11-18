@@ -4,6 +4,8 @@ using Carpathians.Booking.Grpc;
 using Carpathians.Domain.Exceptions;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using Carpathians.Platform.ServiceDefaults.Security;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Carpathians.Api.Grpc;
 
@@ -12,7 +14,10 @@ namespace Carpathians.Api.Grpc;
 /// Тонкий адаптер над BLL Лаб. 02 через I*Service — тобто через декоратори з кешем.
 /// <para>Помилки: некоректний запит — INVALID_ARGUMENT тут; доменні винятки (NotFoundException -> NOT_FOUND)
 /// перетворює <see cref="BookingGrpcExceptionInterceptor"/>.</para>
+/// <para>Лаб. 09: доступ лише з access token IdentityServer зі scope <c>bookings.read</c>
+/// (Aggregator отримує його через Client Credentials, клієнт aggregator_service).</para>
 /// </summary>
+[Authorize(Policy = ScopePolicies.BookingsRead)]
 public sealed class BookingGrpcService(
     IBookingService bookings,
     ICustomerService customers,

@@ -5,6 +5,8 @@ using Carpathians.Reviews.Domain.Exceptions;
 using Carpathians.Reviews.Grpc;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using Carpathians.Platform.ServiceDefaults.Security;
+using Microsoft.AspNetCore.Authorization;
 using MediatR;
 
 namespace Carpathians.Reviews.WebApi.Grpc;
@@ -15,7 +17,10 @@ namespace Carpathians.Reviews.WebApi.Grpc;
 /// логування й кеш (CachedReviewQueries) працюють однаково для обох протоколів.
 /// <para>Помилки: некоректний запит — INVALID_ARGUMENT тут або з валідаторів FluentValidation;
 /// доменні винятки перетворює <see cref="ReviewsGrpcExceptionInterceptor"/>.</para>
+/// <para>Лаб. 09: доступ лише з access token IdentityServer зі scope <c>reviews.read</c>
+/// (Aggregator отримує його через Client Credentials, клієнт aggregator_service).</para>
 /// </summary>
+[Authorize(Policy = ScopePolicies.ReviewsRead)]
 public sealed class ReviewsGrpcService(ISender mediator) : ReviewsGrpc.ReviewsGrpcBase
 {
     public const int MaxBatchSize = 100;

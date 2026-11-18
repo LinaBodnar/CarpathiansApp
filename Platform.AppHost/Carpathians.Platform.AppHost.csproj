@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Services\Payments\Carpathians.Payments.Api\Carpathians.Payments.Api.csproj" />
     <ProjectReference Include="..\Platform.ApiGateway\Carpathians.Platform.ApiGateway.csproj" />
     <ProjectReference Include="..\Platform.Aggregator\Carpathians.Platform.Aggregator.csproj" />
+    <ProjectReference Include="..\Platform.IdentityServer\Carpathians.Platform.IdentityServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
