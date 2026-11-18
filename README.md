@@ -19,30 +19,59 @@ Carpathians - веб-платформа для любителів активно
 ## 3. Структура репозиторію
 
 ```
-carpathians-databases/
+<корінь репозиторію>/
 ├── README.md
-├── booking-db/
-│   ├── schema.sql              # DDL: таблиці, ключі, CHECK, індекси
-│   ├── procedures.sql          # 6 процедур + функція переходів статусів
-│   ├── seed.sql                # тестові дані (ідемпотентний)
-│   ├── checks.sql              # перевірка обмежень схеми
-│   └── checks_procedures.sql   # перевірка процедур
-├── catalog-db/
-│   ├── schema.sql
-│   └── seed.sql
-├── platform/                   # Проєкт №5 — .NET Aspire: AppHost, ServiceDefaults, Gateway, Aggregator
-│                               # Проєкт №6 — gRPC-контракти (Protos/), дворівневий кеш, Aggregator на gRPC
-├── reviews-service/            # Проєкт №3 — сервіс відгуків (Clean Architecture + CQRS + MongoDB)
-├── reviews-db/
-│   ├── init.js                 # колекції, JSON Schema, індекси
-│   ├── seed.js                 # тестові дані (ідемпотентний)
-│   ├── queries.js              # запити й aggregation pipeline
-│   └── sample-docs.json        # приклади документів
+├── Platform.slnx                       # одне рішення на всю платформу
+├── Platform.AppHost/                   # оркестрація Aspire (AppHost.cs) — Проєкт №5
+├── Platform.ServiceDefaults/           # Serilog, OpenTelemetry, CorrelationId, resilience, health checks, кеш
+├── Platform.ApiGateway/                # YARP — єдина точка входу
+├── Platform.Aggregator/                # gRPC-/HTTP-клієнти, агрегація, кеш агрегатів, політики стійкості
+├── Protos/common/                      # спільні типи gRPC-контрактів (DecimalValue)
+├── Services/
+│   ├── Booking/                        # Проєкт №1 — ADO.NET + Dapper (Лаб. 02)
+│   │   ├── Carpathians.Booking.Api/    # контролери, Protos/, Grpc/, Caching/, Program.cs
+│   │   ├── Carpathians.Booking.Bll/
+│   │   ├── Carpathians.Booking.Dal/
+│   │   ├── Carpathians.Booking.Domain/
+│   │   └── Carpathians.Booking.Tests/
+│   ├── Catalog/                        # Проєкт №2 — EF Core (Лаб. 03)
+│   │   ├── Carpathians.Catalog.Api/    # + Dockerfile
+│   │   ├── Carpathians.Catalog.Bll/
+│   │   ├── Carpathians.Catalog.Dal/    # DbContext, Configurations/, Migrations/
+│   │   ├── Carpathians.Catalog.Domain/
+│   │   └── Carpathians.Catalog.Tests/
+│   └── Reviews/                        # Проєкт №3 — Clean Architecture + CQRS + MongoDB (Лаб. 04)
+│       ├── Carpathians.Reviews.Domain/
+│       ├── Carpathians.Reviews.Application/
+│       ├── Carpathians.Reviews.Infrastructure/
+│       ├── Carpathians.Reviews.WebApi/
+│       └── Carpathians.Reviews.Tests/
+├── db/
+│   ├── p1/                             # BookingContext (SQL Server)
+│   │   ├── schema.sql                  # DDL: таблиці, ключі, CHECK, індекси
+│   │   ├── procedures.sql              # 6 процедур + функція переходів статусів
+│   │   ├── seed.sql                    # тестові дані (ідемпотентний)
+│   │   ├── checks.sql                  # перевірка обмежень схеми
+│   │   └── checks_procedures.sql       # перевірка процедур
+│   ├── p2/                             # CatalogContext (SQL Server)
+│   │   ├── schema.sql                  # схема з міграцій EF Core (Лаб. 03)
+│   │   ├── seed.sql
+│   │   ├── migrations.sql              # ідемпотентний скрипт міграцій
+│   │   └── design/                     # проєктна схема й дані Лаб. 01
+│   └── p3/                             # ReviewContext (MongoDB)
+│       ├── collections.js              # колекції, JSON Schema, індекси
+│       ├── seed.js                     # тестові дані (ідемпотентний)
+│       └── queries.js                  # запити й aggregation pipeline
 └── docs/
-    ├── erd-booking.dbml        # ERD Проєкту №1 (dbdiagram.io)
-    ├── erd-catalog.dbml        # ERD Проєкту №2 (dbdiagram.io)
-    └── duplication-policy.md
+    ├── platform.md                     # платформа: Aspire, gRPC, кеш, resilience, health checks
+    ├── erd-booking.dbml                # ERD Проєкту №1 (dbdiagram.io)
+    ├── erd-catalog.dbml                # ERD Проєкту №2 (dbdiagram.io)
+    ├── erd-catalog.md
+    └── erd-catalog.mermaid
 ```
+
+Сервіси з Лаб. 02–04 зберігають власні AppHost-проєкти (`Services/*/Carpathians.*.AppHost`) для автономного запуску;
+вся платформа запускається з `Platform.AppHost`.
 
 ## 4. Що потрібно встановити
 
@@ -74,30 +103,30 @@ docker run -d --name mongo-carpathians -p 27017:27017 mongo:7
 Порядок важливий. Виконуйте скрипти в SSMS (Execute) або через `sqlcmd` (прапорець `-I` **обов'язковий**: у схемі є фільтровані індекси, а процедури запам'ятовують `QUOTED_IDENTIFIER`).
 
 ```bash
-sqlcmd -S . -E -I -i booking-db/schema.sql
-sqlcmd -S . -E -I -i booking-db/procedures.sql
-sqlcmd -S . -E -I -i booking-db/seed.sql
+sqlcmd -S . -E -I -i db/p1/schema.sql
+sqlcmd -S . -E -I -i db/p1/procedures.sql
+sqlcmd -S . -E -I -i db/p1/seed.sql
 ```
 
 Для Docker-варіанту замініть `-E` на `-U sa -P "YourStrong!Passw0rd" -C` і вкажіть `-S localhost,1433`.
 
-Перевірка: `booking-db/checks.sql` (обмеження, FK, каскади, індекси) і `booking-db/checks_procedures.sql` (процедури). Усі рядки в Messages мають починатися з `OK`.
+Перевірка: `db/p1/checks.sql` (обмеження, FK, каскади, індекси) і `db/p1/checks_procedures.sql` (процедури). Усі рядки в Messages мають починатися з `OK`.
 
 ### 5.2. Каталог (CatalogContext)
 
 ```bash
-sqlcmd -S . -E -I -i catalog-db/schema.sql
-sqlcmd -S . -E -I -i catalog-db/seed.sql
+sqlcmd -S . -E -I -i db/p2/design/schema.sql
+sqlcmd -S . -E -I -i db/p2/design/seed.sql
 ```
 
-`catalog-db/schema.sql` - проєктна схема для звіту; у Лаб. 03 її реалізує EF Core Code First (Fluent API, міграції, `HasData`).
+`db/p2/design/schema.sql` - проєктна схема для звіту; у Лаб. 03 її реалізує EF Core Code First (Fluent API, міграції, `HasData`).
 
 ### 5.3. Відгуки (ReviewContext, MongoDB)
 
 ```bash
-mongosh "mongodb://localhost:27017" --file reviews-db/init.js
-mongosh "mongodb://localhost:27017" --file reviews-db/seed.js
-mongosh "mongodb://localhost:27017" --file reviews-db/queries.js   # приклади запитів
+mongosh "mongodb://localhost:27017" --file db/p3/collections.js
+mongosh "mongodb://localhost:27017" --file db/p3/seed.js
+mongosh "mongodb://localhost:27017" --file db/p3/queries.js   # приклади запитів
 ```
 
 ### 5.4. Повторний запуск
@@ -160,7 +189,7 @@ Cancelled - лише зі Submitted, AwaitingValidation, SeatsConfirmed (до о
 
 ## 11. Права доступу
 
-У кінці `booking-db/schema.sql` і `catalog-db/schema.sql` наведено закоментований приклад окремого логіна застосунку з доступом лише до своєї БД (принцип найменших привілеїв).
+У кінці `db/p1/schema.sql` і `db/p2/design/schema.sql` наведено закоментований приклад окремого логіна застосунку з доступом лише до своєї БД (принцип найменших привілеїв).
 
 ## 12. Booking Service (Лаб. 02)
 
@@ -170,7 +199,7 @@ Cancelled - лише зі Submitted, AwaitingValidation, SeatsConfirmed (до о
 ### 12.1. Структура рішення
 
 ```
-booking-service/
+Services/Booking/
 ├── Carpathians.Booking.Domain/   # моделі, константи, доменні винятки
 ├── Carpathians.Booking.Dal/      # репозиторії (ADO.NET, Dapper), UnitOfWork
 ├── Carpathians.Booking.Bll/      # сервіси, DTO, профілі AutoMapper
@@ -201,15 +230,15 @@ booking-service/
 1. Запустіть Docker Desktop.
 2. Запустіть проєкт `Carpathians.Booking.AppHost` (з IDE або `dotnet run` у його папці).
    Пароль SQL Server для локальної розробки задано в
-   `booking-service/Carpathians.Booking.AppHost/appsettings.Development.json`
+   `Services/Booking/Carpathians.Booking.AppHost/appsettings.Development.json`
    (`Parameters:sql-password`). Це пароль лише локального контейнера.
 3. Aspire створить порожню базу `BookingContext` у контейнері (порт `14333`).
    Застосуйте скрипти з кореня репозиторію в такому порядку:
 
 ```bash
-sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i booking-db/schema.sql
-sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i booking-db/procedures.sql
-sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i booking-db/seed.sql
+sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i db/p1/schema.sql
+sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i db/p1/procedures.sql
+sqlcmd -S localhost,14333 -U sa -P "<пароль>" -C -I -i db/p1/seed.sql
 ```
 
 Прапорець `-I` обов'язковий. Замість `sqlcmd` можна виконати ці три файли в Database-панелі
@@ -300,7 +329,7 @@ curl <url>/api/bookings/99999
 Unit-тести BLL (мокається Unit of Work) і перевірка конфігурації AutoMapper:
 
 ```bash
-dotnet test booking-service/Carpathians.Booking.Tests
+dotnet test Services/Booking/Carpathians.Booking.Tests
 ```
 
 ## Проєкт №2 — Catalog (EF Core)
@@ -338,9 +367,9 @@ dotnet test booking-service/Carpathians.Booking.Tests
    ```bash
    docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=YourStrong!Passw0rd" -p 1434:1433 --name sql-catalog -d mcr.microsoft.com/mssql/server:2022-latest
    ```
-2. Перейдіть до теки `catalog-service` та виконайте запуск:
+2. Перейдіть до теки `Services/Catalog` та виконайте запуск:
    ```bash
-   cd catalog-service/Carpathians.Catalog.Api
+   cd Services/Catalog/Carpathians.Catalog.Api
    dotnet run
    ```
    API слухає на `http://localhost:5231`.
@@ -348,14 +377,14 @@ dotnet test booking-service/Carpathians.Booking.Tests
 
 #### Варіант Б: Запуск через .NET Aspire AppHost
 ```bash
-cd catalog-service/Carpathians.Catalog.AppHost
+cd Services/Catalog/Carpathians.Catalog.AppHost
 dotnet run
 ```
 
 #### Варіант В: Збірка Docker-образу
 ```bash
-cd catalog-service
-docker build -t carpathians-catalog-api -f Carpathians.Catalog.Api/Dockerfile .
+# з кореня репозиторію (сервіс посилається на Platform.ServiceDefaults і Protos/)
+docker build -t carpathians-catalog-api -f Services/Catalog/Carpathians.Catalog.Api/Dockerfile .
 docker run -p 8080:8080 -e ConnectionStrings__CatalogDb="Server=host.docker.internal,1434;Database=CatalogContext;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True" carpathians-catalog-api
 ```
 
@@ -367,15 +396,15 @@ docker run -p 8080:8080 -e ConnectionStrings__CatalogDb="Server=host.docker.inte
 
 - **Створення нової міграції**:
   ```bash
-  dotnet ef migrations add <MigrationName> --project catalog-service/Carpathians.Catalog.Dal --startup-project catalog-service/Carpathians.Catalog.Api
+  dotnet ef migrations add <MigrationName> --project Services/Catalog/Carpathians.Catalog.Dal --startup-project Services/Catalog/Carpathians.Catalog.Api
   ```
 - **Застосування міграцій до бази даних**:
   ```bash
-  dotnet ef database update --project catalog-service/Carpathians.Catalog.Dal --startup-project catalog-service/Carpathians.Catalog.Api
+  dotnet ef database update --project Services/Catalog/Carpathians.Catalog.Dal --startup-project Services/Catalog/Carpathians.Catalog.Api
   ```
 - **Генерація ідемпотентного SQL-скрипта міграції**:
   ```bash
-  dotnet ef migrations script --idempotent --project catalog-service/Carpathians.Catalog.Dal --startup-project catalog-service/Carpathians.Catalog.Api -o migrations.sql
+  dotnet ef migrations script --idempotent --project Services/Catalog/Carpathians.Catalog.Dal --startup-project Services/Catalog/Carpathians.Catalog.Api -o migrations.sql
   ```
 
 > **Примітка:** У середовищах розробки (`!env.IsProduction()`) міграції та сідінг автоматично виконуються під час старту застосунку в `Program.cs`.
@@ -484,7 +513,7 @@ docker run -p 8080:8080 -e ConnectionStrings__CatalogDb="Server=host.docker.inte
 
 Сервіс відгуків, коментарів і обговорень маршрутів на базі `ReviewContext` (MongoDB). Побудований за
 **Clean Architecture** з чотирма шарами (Domain, Application, Infrastructure, WebApi), принципом **CQRS**
-і патерном **Mediator** (MediatR) на **.NET 8**. Повний опис — [`reviews-service/README.md`](reviews-service/README.md).
+і патерном **Mediator** (MediatR) на **.NET 8**. Повний опис — [`Services/Reviews/README.md`](Services/Reviews/README.md).
 
 ### Коротко
 
@@ -502,7 +531,7 @@ docker run -p 8080:8080 -e ConnectionStrings__CatalogDb="Server=host.docker.inte
 
 ```bash
 docker run -d --name mongo-carpathians -p 27017:27017 mongo:7
-cd reviews-service/Carpathians.Reviews.WebApi
+cd Services/Reviews/Carpathians.Reviews.WebApi
 dotnet run
 ```
 
@@ -510,17 +539,17 @@ Swagger UI: `http://localhost:5203/swagger`. Індекси та початко�
 
 ## Проєкт №5 — Платформа на .NET Aspire
 
-Сервіси з Лаб. 02–04 інтегровано в єдину платформу (тека `platform/`): **AppHost** запускає контейнери
+Сервіси з Лаб. 02–04 інтегровано в єдину платформу (теки `Platform.*` у корені): **AppHost** запускає контейнери
 SQL Server і MongoDB, три сервіси, Aggregator і Gateway однією командою; **ServiceDefaults** дає всім
 сервісам однакове структуроване логування (Serilog → Aspire Dashboard), трасування OpenTelemetry
 (HTTP, SQL Server, MongoDB) і наскрізний `X-Correlation-Id`; **API Gateway** на YARP — єдина точка
 входу `http://localhost:5000`; **Aggregator** паралельно збирає картку бронювання з трьох сервісів
 і повертає часткову відповідь, якщо один із них недоступний. Повний опис —
-[`platform/README.md`](platform/README.md).
+[`docs/platform.md`](docs/platform.md).
 
 ```powershell
-dotnet user-secrets set "Parameters:sql-password" "YourStrong!Passw0rd" --project platform/Carpathians.Platform.AppHost
-dotnet run --project platform/Carpathians.Platform.AppHost
+dotnet user-secrets set "Parameters:sql-password" "YourStrong!Passw0rd" --project Platform.AppHost
+dotnet run --project Platform.AppHost
 ```
 
 ## Проєкт №6 — gRPC-виклики та кешування
@@ -540,5 +569,5 @@ dotnet run --project platform/Carpathians.Platform.AppHost
   метрики `cache.hits` / `cache.misses` / `cache.hit_ratio`, CorrelationId у метаданих gRPC-викликів;
   ендпоінт порівняння затримок HTTP і gRPC.
 
-Повний опис — [`platform/README.md`](platform/README.md#8-grpc-і-кешування-лаб-06). Запуск — так само, як у Проєкті №5.
+Повний опис — [`docs/platform.md`](docs/platform.md#8-grpc-і-кешування-лаб-06). Запуск — так само, як у Проєкті №5.
 

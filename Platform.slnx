@@ -1,0 +1,36 @@
+<Solution>
+  <Folder Name="/Platform/">
+    <Project Path="Platform.AppHost/Carpathians.Platform.AppHost.csproj" />
+    <Project Path="Platform.ServiceDefaults/Carpathians.Platform.ServiceDefaults.csproj" />
+    <Project Path="Platform.ApiGateway/Carpathians.Platform.ApiGateway.csproj" />
+    <Project Path="Platform.Aggregator/Carpathians.Platform.Aggregator.csproj" />
+  </Folder>
+  <Folder Name="/Services/" />
+  <Folder Name="/Services/Booking/">
+    <Project Path="Services/Booking/Carpathians.Booking.Api/Carpathians.Booking.Api.csproj" />
+    <Project Path="Services/Booking/Carpathians.Booking.Bll/Carpathians.Booking.Bll.csproj" />
+    <Project Path="Services/Booking/Carpathians.Booking.Dal/Carpathians.Booking.Dal.csproj" />
+    <Project Path="Services/Booking/Carpathians.Booking.Domain/Carpathians.Booking.Domain.csproj" />
+    <Project Path="Services/Booking/Carpathians.Booking.Tests/Carpathians.Booking.Tests.csproj" />
+    <Project Path="Services/Booking/Carpathians.Booking.AppHost/Carpathians.Booking.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/Services/Catalog/">
+    <Project Path="Services/Catalog/Carpathians.Catalog.Api/Carpathians.Catalog.Api.csproj" />
+    <Project Path="Services/Catalog/Carpathians.Catalog.Bll/Carpathians.Catalog.Bll.csproj" />
+    <Project Path="Services/Catalog/Carpathians.Catalog.Dal/Carpathians.Catalog.Dal.csproj" />
+    <Project Path="Services/Catalog/Carpathians.Catalog.Domain/Carpathians.Catalog.Domain.csproj" />
+    <Project Path="Services/Catalog/Carpathians.Catalog.Tests/Carpathians.Catalog.Tests.csproj" />
+    <Project Path="Services/Catalog/Carpathians.Catalog.AppHost/Carpathians.Catalog.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/Services/Reviews/">
+    <Project Path="Services/Reviews/Carpathians.Reviews.Domain/Carpathians.Reviews.Domain.csproj" />
+    <Project Path="Services/Reviews/Carpathians.Reviews.Application/Carpathians.Reviews.Application.csproj" />
+    <Project Path="Services/Reviews/Carpathians.Reviews.Infrastructure/Carpathians.Reviews.Infrastructure.csproj" />
+    <Project Path="Services/Reviews/Carpathians.Reviews.WebApi/Carpathians.Reviews.WebApi.csproj" />
+    <Project Path="Services/Reviews/Carpathians.Reviews.Tests/Carpathians.Reviews.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+    <File Path="Protos/common/types.proto" />
+  </Folder>
+</Solution>
