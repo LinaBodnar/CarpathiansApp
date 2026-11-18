@@ -3,12 +3,12 @@ using Carpathians.Reviews.Application;
 using Carpathians.Reviews.Application.Common.Interfaces;
 using Carpathians.Reviews.Domain.Interfaces;
 using Carpathians.Reviews.Infrastructure;
-using Carpathians.Reviews.Infrastructure.HealthChecks;
 using Carpathians.Reviews.Infrastructure.Persistence.Queries;
 using Carpathians.Reviews.Infrastructure.Persistence.Repositories;
 using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Reviews.WebApi.Caching;
 using Carpathians.Reviews.WebApi.Grpc;
+using Carpathians.Reviews.WebApi.HealthChecks;
 using Carpathians.Reviews.WebApi.Mappings;
 using Carpathians.Reviews.WebApi.Metrics;
 using Carpathians.Reviews.WebApi.Middleware;
@@ -77,8 +77,9 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
 });
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-builder.Services.AddHealthChecks()
-    .AddCheck<MongoDbHealthCheck>("mongodb", tags: new[] { "db", "ready" });
+// Health checks (Лаб. 07): reviews-db (MongoDB ping, Unhealthy), redis-cache (Degraded), gRPC Health Checking Protocol.
+// Endpoints /health, /health/live, /health/ready, /health/startup публікує MapDefaultEndpoints (ServiceDefaults).
+builder.AddReviewsHealthChecks();
 
 // gRPC-сервер (Лаб. 06): HTTP/2 через HTTPS-endpoint (Http1AndHttp2, ALPN), interceptor-и:
 // логування/трасування викликів і перетворення доменних винятків на коди статусу gRPC.
@@ -114,9 +115,10 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapGrpcService<ReviewsGrpcService>();          // gRPC: carpathians.reviews.v1.ReviewsGrpc
+app.MapGrpcHealthChecksService();                  // gRPC: grpc.health.v1.Health (Check/Watch) — для Aggregator
 if (app.Environment.IsDevelopment())
     app.MapGrpcReflectionService();               // опис сервісів для Postman/grpcurl
-app.MapDefaultEndpoints();                          // /health (у т. ч. MongoDB) і /alive
+app.MapDefaultEndpoints();                          // /health, /health/live, /health/ready, /health/startup, /alive
 
 app.Run();
 

@@ -30,6 +30,9 @@ var redis = builder.AddRedis("redis")
     .WithDataVolume("carpathians-redis-data");
 
 // ---------- Мікросервіси (ім'я ресурсу = логічне ім'я для service discovery) ----------
+// WithHttpHealthCheck("/health") (Лаб. 07): Dashboard показує стан кожного ресурсу (Healthy / Degraded / Unhealthy)
+// за health checks сервісу (БД, Redis, gRPC-залежності), а WaitFor чекає, поки залежність стане здоровою,
+// а не лише запуститься. Деталі перевірок — JSON на /health, /health/ready; liveness — /health/live.
 // Профіль "https": gRPC працює поверх HTTP/2, а Kestrel узгоджує HTTP/2 через ALPN лише з TLS.
 // Тож кожен сервіс завжди має HTTPS-endpoint (Http1AndHttp2): REST через Gateway + gRPC для Aggregator.
 
@@ -76,6 +79,7 @@ builder.AddProject<Projects.Carpathians_Platform_ApiGateway>("gateway")
     .WithReference(catalog)
     .WithReference(reviews)
     .WithReference(aggregator)
-    .WaitFor(aggregator);
+    .WaitFor(aggregator)
+    .WithHttpHealthCheck("/health");
 
 builder.Build().Run();

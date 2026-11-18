@@ -34,4 +34,10 @@
     <Compile Include="..\Protos\common\DecimalValue.cs" Link="Protos\common\DecimalValue.cs" />
   </ItemGroup>
 
+  <!-- Лаб. 07: health checks залежностей і стандартний gRPC Health Checking Protocol -->
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+    <PackageReference Include="Grpc.HealthCheck" Version="2.76.0" />
+  </ItemGroup>
+
 </Project>

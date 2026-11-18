@@ -129,7 +129,7 @@ Aggregator → Gateway.
 CorrelationId — бізнес-ідентифікатор звернення, який створює застосунок (його можна назвати в підтримці);
 TraceId — технічний ідентифікатор трасування, який генерує OpenTelemetry.
 
-**Health checks:** `/health` — усі перевірки (у т. ч. MongoDB для Відгуків), `/alive` — лише «процес живий».
+**Health checks (Лаб. 07):** `/health` — усі перевірки; `/health/live` (і `/alive`) — лише «процес живий»; `/health/ready` — БД, Redis (Degraded) і gRPC-залежності; `/health/startup` — запуск завершено. Відповіді — JSON з деталями кожної перевірки; мікросервіси також відповідають за стандартним gRPC Health Checking Protocol (`grpc.health.v1.Health`).
 
 ---
 

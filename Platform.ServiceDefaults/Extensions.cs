@@ -1,6 +1,6 @@
-using System.Text.Json;
 using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Platform.ServiceDefaults.Correlation;
+using Carpathians.Platform.ServiceDefaults.Health;
 using Carpathians.Platform.ServiceDefaults.Metrics;
 using Carpathians.Platform.ServiceDefaults.Resilience;
 using Microsoft.AspNetCore.Builder;
@@ -29,9 +29,8 @@ namespace Microsoft.Extensions.Hosting;
 /// </summary>
 public static class Extensions
 {
-    private const string HealthEndpointPath = "/health";
-    private const string AlivenessEndpointPath = "/alive";
-    private const string CacheHealthEndpointPath = "/health/cache";
+    /// <summary>gRPC Health Checking Protocol (grpc.health.v1.Health/Check) — службові виклики, не трасуються.</summary>
+    private const string GrpcHealthPath = "/grpc.health.v1.Health";
 
     /// <summary>ActivitySource драйвера MongoDB (пакет MongoDB.Driver.Core.Extensions.DiagnosticSources).</summary>
     public const string MongoDbActivitySource = "MongoDB.Driver.Core.Extensions.DiagnosticSources";
@@ -146,10 +145,14 @@ public static class Extensions
                 .AddSource("Carpathians.*")
                 .AddSource(MongoDbActivitySource)                     // MongoDB (Лаб. 04)
                 .AddSource(GrpcClientActivitySource)                  // gRPC-клієнт (Лаб. 06): span виклику між клієнтом і HTTP/2-запитом
+                // службові перевірки стану (/health/*, /alive, gRPC health) не засмічують traces
                 .AddAspNetCoreInstrumentation(o => o.Filter = context =>
-                    !context.Request.Path.StartsWithSegments(HealthEndpointPath)
-                    && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath))
-                .AddHttpClientInstrumentation()                       // вихідні виклики (Aggregator, YARP)
+                    !context.Request.Path.StartsWithSegments(HealthEndpointPaths.All)
+                    && !context.Request.Path.StartsWithSegments(HealthEndpointPaths.Alive)
+                    && !context.Request.Path.StartsWithSegments(GrpcHealthPath))
+                .AddHttpClientInstrumentation(o => o.FilterHttpRequestMessage = request =>
+                    request.RequestUri?.AbsolutePath.StartsWith(GrpcHealthPath, StringComparison.Ordinal) != true)
+                                                                      // вихідні виклики (Aggregator, YARP)
                 .AddSqlClientInstrumentation());                      // Dapper (Лаб. 02) і EF Core (Лаб. 03)
 
         builder.AddOpenTelemetryExporters();
@@ -176,11 +179,17 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Базові перевірки кожного сервісу: "self" (liveness — процес відповідає) і "startup" (запуск завершено).
+    /// Перевірки залежностей (БД, Redis, gRPC) сервіси додають самі — у папці HealthChecks/ свого .Api;
+    /// усі вони накопичуються в одній колекції, порядок відносно AddServiceDefaults() не важливий.
+    /// </summary>
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks()
-            .AddCheck("self", () => HealthCheckResult.Healthy(), new[] { "live" });
+            .AddCheck("self", () => HealthCheckResult.Healthy("Process is responding"), [HealthTags.Live])
+            .AddCheck<StartupHealthCheck>("startup", tags: [HealthTags.Startup]);
 
         return builder;
     }
@@ -197,36 +206,29 @@ public static class Extensions
         // Development: керована імітація збоїв /dev/faults для перевірки resilience (Лаб. 07)
         app.UseFaultInjection();
 
-        // /health — усі перевірки (готовність, у т. ч. БД); /alive — лише «процес живий»
-        app.MapHealthChecks(HealthEndpointPath);
-        app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-        {
-            Predicate = r => r.Tags.Contains("live")
-        });
+        // Health endpoints (Лаб. 07). Перевірки розподіляються за тегами; коди відповіді стандартні:
+        // Healthy і Degraded -> 200, Unhealthy -> 503. Відповідь — JSON з деталями кожної перевірки.
+        //   /health         — усі перевірки (WithHttpHealthCheck в AppHost, стан ресурсу в Dashboard);
+        //   /health/live    — liveness: лише процес ("self", тег live), без зовнішніх залежностей — миттєво;
+        //   /health/ready   — readiness: БД, Redis, gRPC-залежності (тег ready);
+        //   /health/startup — startup: застосунок завершив запуск (тег startup);
+        //   /alive          — liveness шаблону Aspire (сумісність), те саме, що /health/live.
+        MapHealthEndpoint(app, HealthEndpointPaths.All, _ => true);
+        MapHealthEndpoint(app, HealthEndpointPaths.Live, r => r.Tags.Contains(HealthTags.Live));
+        MapHealthEndpoint(app, HealthEndpointPaths.Ready, r => r.Tags.Contains(HealthTags.Ready));
+        MapHealthEndpoint(app, HealthEndpointPaths.Startup, r => r.Tags.Contains(HealthTags.Startup));
+        MapHealthEndpoint(app, HealthEndpointPaths.Alive, r => r.Tags.Contains(HealthTags.Live));
 
-        // /health/cache — статистика кешу (Лаб. 06) у JSON: записи, розмір, попадання/промахи
-        app.MapHealthChecks(CacheHealthEndpointPath, new HealthCheckOptions
-        {
-            Predicate = r => r.Tags.Contains("cache"),
-            ResponseWriter = WriteHealthDetailsAsync
-        });
+        // /health/cache — статистика кешу (Лаб. 06): записи, розмір, попадання/промахи, стан Redis
+        MapHealthEndpoint(app, HealthEndpointPaths.Cache, r => r.Tags.Contains(HealthTags.Cache));
 
         return app;
     }
 
-    private static Task WriteHealthDetailsAsync(HttpContext context, HealthReport report)
-    {
-        context.Response.ContentType = "application/json; charset=utf-8";
-        var body = new
+    private static void MapHealthEndpoint(WebApplication app, string path, Func<HealthCheckRegistration, bool> predicate)
+        => app.MapHealthChecks(path, new HealthCheckOptions
         {
-            status = report.Status.ToString(),
-            checks = report.Entries.ToDictionary(e => e.Key, e => new
-            {
-                status = e.Value.Status.ToString(),
-                description = e.Value.Description,
-                data = e.Value.Data
-            })
-        };
-        return context.Response.WriteAsync(JsonSerializer.Serialize(body, new JsonSerializerOptions { WriteIndented = true }));
-    }
+            Predicate = predicate,
+            ResponseWriter = HealthResponseWriter.WriteAsync
+        });
 }

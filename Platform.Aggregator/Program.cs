@@ -6,6 +6,7 @@ using Carpathians.Catalog.Grpc;
 using Carpathians.Platform.Aggregator.Caching;
 using Carpathians.Platform.Aggregator.Clients;
 using Carpathians.Platform.Aggregator.Grpc;
+using Carpathians.Platform.Aggregator.HealthChecks;
 using Carpathians.Platform.Aggregator.Metrics;
 using Carpathians.Platform.Aggregator.Resilience;
 using Carpathians.Platform.Aggregator.Services;
@@ -78,6 +79,10 @@ builder.Services.AddSingleton(sp => new AggregatedResponseCache(
 // Бізнес-метрики (Лаб. 07): Meter "Aggregator.Api" — результати агрегації, збої мікросервісів, стан circuit breaker
 builder.Services.AddSingleton<CircuitBreakerStates>();
 builder.Services.AddSingleton<AggregatorMetrics>();
+
+// Health checks (Лаб. 07): booking-api, catalog-api, reviews-api — стандартним gRPC Health Checking Protocol
+// (deadline 2 с; критичні -> Unhealthy, reviews-api -> Degraded), redis-cache -> Degraded.
+builder.AddAggregatorHealthChecks(() => CreateGrpcHandler(builder.Environment));
 
 builder.Services.AddScoped<AggregationService>();          // gRPC — основна агрегація
 builder.Services.AddScoped<HttpAggregationService>();      // HTTP (Лаб. 05) — для порівняння

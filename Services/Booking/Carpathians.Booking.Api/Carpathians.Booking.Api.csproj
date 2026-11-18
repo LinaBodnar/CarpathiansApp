@@ -34,4 +34,11 @@
       <ProjectReference Include="..\Carpathians.Booking.Domain\Carpathians.Booking.Domain.csproj" />
     </ItemGroup>
 
+  <!-- Лаб. 07: health checks залежностей і стандартний gRPC Health Checking Protocol -->
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+    <PackageReference Include="Grpc.AspNetCore.HealthChecks" Version="2.76.0" />
+  </ItemGroup>
+
 </Project>

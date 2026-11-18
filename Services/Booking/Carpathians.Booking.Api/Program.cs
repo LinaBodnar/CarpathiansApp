@@ -1,5 +1,6 @@
 using Carpathians.Api.Caching;
 using Carpathians.Api.Grpc;
+using Carpathians.Api.HealthChecks;
 using Carpathians.Api.Metrics;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
@@ -34,6 +35,10 @@ if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("redis")))
             options.AsyncTimeout = 1000;        // недоступний Redis не затримує запит надовго
         });
 }
+// Health checks (Лаб. 07): booking-db (SQL Server, Unhealthy), redis-cache (Degraded), gRPC Health Checking Protocol.
+// Endpoints /health, /health/live, /health/ready, /health/startup публікує MapDefaultEndpoints (ServiceDefaults).
+builder.AddBookingHealthChecks(connectionString);
+
 // L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
 builder.AddPlatformCaching();
 
@@ -90,6 +95,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapGrpcService<BookingGrpcService>();          // gRPC: carpathians.booking.v1.BookingGrpc
+app.MapGrpcHealthChecksService();                  // gRPC: grpc.health.v1.Health (Check/Watch) — для Aggregator
 if (app.Environment.IsDevelopment())
     app.MapGrpcReflectionService();               // опис сервісів для Postman/grpcurl
 app.MapDefaultEndpoints();
