@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Platform.ServiceDefaults.Correlation;
+using Carpathians.Platform.ServiceDefaults.Resilience;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
@@ -40,6 +41,9 @@ public static class Extensions
     /// </summary>
     public const string GrpcClientActivitySource = "Grpc.Net.Client";
 
+    /// <summary>Meter Polly: resilience.polly.strategy.events (OnRetry, OnCircuitOpened...), тривалість спроб і викликів.</summary>
+    public const string ResilienceMeter = "Polly";
+
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
@@ -51,9 +55,15 @@ public static class Extensions
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddTransient<CorrelationIdHandler>();
 
+        builder.Services.AddSingleton<FaultInjectionState>();     // імітація збоїв (лише Development)
+
+        // Standard Resilience Handler (Polly): rate limiter -> загальний таймаут -> retry -> circuit breaker
+        // -> таймаут спроби — для ВСІХ HttpClient, у т. ч. gRPC-клієнтів (вони створюються тією самою фабрикою).
+        // Клієнт з іншими вимогами спершу прибирає цей обробник (RemoveAllResilienceHandlers), а потім
+        // додає власний — обробники не нашаровуються (див. Aggregator, Resilience/DownstreamResilience.cs).
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            http.AddStandardResilienceHandler();                      // детально — Лаб. 07
+            http.AddStandardResilienceHandler();
             http.AddServiceDiscovery();                               // http://booking-api -> реальна адреса
             http.AddHttpMessageHandler<CorrelationIdHandler>();       // CorrelationId у вихідні запити
         });
@@ -85,7 +95,7 @@ public static class Extensions
                 .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
                 .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
                 .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
-                .MinimumLevel.Override("Polly", LogEventLevel.Warning)
+                .MinimumLevel.Override("Polly", LogEventLevel.Information)   // повтори, переходи circuit breaker
                 .MinimumLevel.Override("Yarp", LogEventLevel.Information)
                 .Enrich.FromLogContext()                              // CorrelationId з middleware
                 .Enrich.WithProperty("ServiceName", serviceName)
@@ -122,6 +132,7 @@ public static class Extensions
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter(CacheMetrics.MeterName)                     // кеш: cache.hits, cache.misses, ... (Лаб. 06)
+                .AddMeter(ResilienceMeter)                            // Polly: OnRetry, OnCircuitOpened, ... (Лаб. 07)
                 .AddMeter("Carpathians.*"))                         // інші власні метрики (Gateway)
             .WithTracing(tracing => tracing
                 .SetSampler(CreateSampler(builder))
@@ -177,6 +188,9 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
+        // Development: керована імітація збоїв /dev/faults для перевірки resilience (Лаб. 07)
+        app.UseFaultInjection();
+
         // /health — усі перевірки (готовність, у т. ч. БД); /alive — лише «процес живий»
         app.MapHealthChecks(HealthEndpointPath);
         app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions

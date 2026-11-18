@@ -195,6 +195,8 @@ public sealed class CacheService : ICacheService
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            // Graceful degradation: збій кешу не провалює запит — дані читаються з бази.
+            _logger.LogWarning(ex, "Redis unavailable, falling back to database for {CacheKey}", key);
             _circuit.RecordFailure(ex);
             return (false, null);
         }
@@ -221,6 +223,7 @@ public sealed class CacheService : ICacheService
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            _logger.LogWarning(ex, "Redis unavailable, value for {CacheKey} not cached", key);
             _circuit.RecordFailure(ex);
         }
         finally

@@ -4,6 +4,7 @@ using Carpathians.Catalog.Grpc;
 using Carpathians.Grpc.Common;
 using Carpathians.Platform.Aggregator.Caching;
 using Carpathians.Platform.Aggregator.Models;
+using Carpathians.Platform.Aggregator.Resilience;
 using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Reviews.Grpc;
 using Google.Protobuf.WellKnownTypes;
@@ -18,7 +19,8 @@ namespace Carpathians.Platform.Aggregator.Services;
 /// <item>кеш агрегованих відповідей у Redis перевіряється ДО паралельних викликів; повні відповіді кешуються на 30 с;</item>
 /// <item>часткові відмови: недоступний необов'язковий сервіс (RpcException UNAVAILABLE, DEADLINE_EXCEEDED...)
 /// дає попередження у Warnings, а не помилку всього запиту; NOT_FOUND — це «даних немає», не відмова;</item>
-/// <item>CancellationToken і deadline передаються в кожен виклик.</item>
+/// <item>CancellationToken і deadline передаються в кожен виклик; deadline — загальний таймаут політики сервісу
+/// (<see cref="DownstreamPolicies"/>), тож повтори обох рівнів (Polly і gRPC) не тривають довше за нього.</item>
 /// </list>
 /// Відповіді gRPC перетворюються на ті самі агреговані DTO, що й у Лаб. 05 (HTTP) — контракт для клієнтів не змінився.
 /// </summary>
@@ -30,9 +32,6 @@ public class AggregationService(
     ILogger<AggregationService> logger)
 {
     public const int LatestReviewsCount = 3;
-
-    /// <summary>Deadline одного gRPC-виклику: повільний сервіс не затримує всю агрегацію.</summary>
-    public static readonly TimeSpan CallDeadline = TimeSpan.FromSeconds(5);
 
     private const string BookingService = "booking-api";
     private const string CatalogService = "catalog-api";
@@ -70,7 +69,7 @@ public class AggregationService(
         BookingReply bookingData;
         try
         {
-            bookingData = await booking.GetBookingAsync(new GetBookingRequest { Id = bookingId }, Options(ct));
+            bookingData = await booking.GetBookingAsync(new GetBookingRequest { Id = bookingId }, Options(DownstreamPolicies.Booking, ct));
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
         {
@@ -86,12 +85,12 @@ public class AggregationService(
         // 2. Клієнт і виїзди позицій (booking-api) — паралельно; виїзди — одним пакетним викликом.
         var departureIds = bookingData.Items.Select(i => i.DepartureId).Distinct().ToList();
         var customerTask = SafeAsync(BookingService, $"customer {bookingData.CustomerId}",
-            token => booking.GetCustomerAsync(new GetCustomerRequest { Id = bookingData.CustomerId }, Options(token)).ResponseAsync,
+            token => booking.GetCustomerAsync(new GetCustomerRequest { Id = bookingData.CustomerId }, Options(DownstreamPolicies.Booking, token)).ResponseAsync,
             warnings, ct);
         var departuresTask = departureIds.Count == 0
             ? Task.FromResult<DeparturesReply?>(new DeparturesReply())
             : SafeAsync(BookingService, "departures",
-                token => booking.GetDeparturesByIdsAsync(new GetDeparturesByIdsRequest { Ids = { departureIds } }, Options(token)).ResponseAsync,
+                token => booking.GetDeparturesByIdsAsync(new GetDeparturesByIdsRequest { Ids = { departureIds } }, Options(DownstreamPolicies.Booking, token)).ResponseAsync,
                 warnings, ct);
 
         await Task.WhenAll(customerTask, departuresTask);
@@ -107,15 +106,15 @@ public class AggregationService(
         var routesTask = routeIds.Count == 0
             ? Task.FromResult<RoutesReply?>(new RoutesReply())
             : SafeAsync(CatalogService, "routes",
-                token => catalog.GetRoutesByIdsAsync(new GetRoutesByIdsRequest { Ids = { routeIds } }, Options(token)).ResponseAsync,
+                token => catalog.GetRoutesByIdsAsync(new GetRoutesByIdsRequest { Ids = { routeIds } }, Options(DownstreamPolicies.Catalog, token)).ResponseAsync,
                 warnings, ct);
         var ratingsTask = routeIds.Count == 0
             ? Task.FromResult<RouteRatingsReply?>(new RouteRatingsReply())
             : SafeAsync(ReviewsService, "ratings",
-                token => reviews.GetRatingsForRoutesAsync(new GetRatingsForRoutesRequest { RouteIds = { routeIds } }, Options(token)).ResponseAsync,
+                token => reviews.GetRatingsForRoutesAsync(new GetRatingsForRoutesRequest { RouteIds = { routeIds } }, Options(DownstreamPolicies.Reviews, token)).ResponseAsync,
                 warnings, ct);
         var latestTasks = routeIds.ToDictionary(id => id, id => SafeAsync(ReviewsService, $"reviews of route {id}",
-            token => reviews.GetLatestReviewsAsync(new GetLatestReviewsRequest { RouteId = id, Count = LatestReviewsCount }, Options(token)).ResponseAsync,
+            token => reviews.GetLatestReviewsAsync(new GetLatestReviewsRequest { RouteId = id, Count = LatestReviewsCount }, Options(DownstreamPolicies.Reviews, token)).ResponseAsync,
             warnings, ct));
 
         await Task.WhenAll(latestTasks.Values.Cast<Task>().Append(routesTask).Append(ratingsTask));
@@ -191,11 +190,11 @@ public class AggregationService(
         var warnings = new AggregationWarnings();
 
         var routeTask = SafeAsync(CatalogService, $"route {routeId}",
-            token => catalog.GetRouteAsync(new GetRouteRequest { Id = routeId }, Options(token)).ResponseAsync, warnings, ct);
+            token => catalog.GetRouteAsync(new GetRouteRequest { Id = routeId }, Options(DownstreamPolicies.Catalog, token)).ResponseAsync, warnings, ct);
         var ratingTask = SafeAsync(ReviewsService, $"rating of route {routeId}",
-            token => reviews.GetRouteRatingAsync(new GetRouteRatingRequest { RouteId = routeId }, Options(token)).ResponseAsync, warnings, ct);
+            token => reviews.GetRouteRatingAsync(new GetRouteRatingRequest { RouteId = routeId }, Options(DownstreamPolicies.Reviews, token)).ResponseAsync, warnings, ct);
         var reviewsTask = SafeAsync(ReviewsService, $"reviews of route {routeId}",
-            token => reviews.GetLatestReviewsAsync(new GetLatestReviewsRequest { RouteId = routeId, Count = LatestReviewsCount }, Options(token)).ResponseAsync,
+            token => reviews.GetLatestReviewsAsync(new GetLatestReviewsRequest { RouteId = routeId, Count = LatestReviewsCount }, Options(DownstreamPolicies.Reviews, token)).ResponseAsync,
             warnings, ct);
 
         await Task.WhenAll(routeTask, ratingTask, reviewsTask);
@@ -230,9 +229,9 @@ public class AggregationService(
         await cache.SetAsync(key, result, ct);
     }
 
-    /// <summary>Deadline і скасування — у кожен виклик.</summary>
-    private static CallOptions Options(CancellationToken ct)
-        => new(deadline: DateTime.UtcNow.Add(CallDeadline), cancellationToken: ct);
+    /// <summary>Deadline (загальний таймаут політики сервісу) і скасування — у кожен виклик.</summary>
+    private static CallOptions Options(DownstreamPolicy policy, CancellationToken ct)
+        => new(deadline: DateTime.UtcNow.Add(policy.CallDeadline), cancellationToken: ct);
 
     /// <summary>
     /// Виклик необов'язкового сервісу: NOT_FOUND -> null (даних немає), інші RpcException

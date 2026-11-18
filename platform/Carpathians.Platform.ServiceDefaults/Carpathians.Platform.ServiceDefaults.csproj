@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- service discovery і resilience для HttpClient -->
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
+    <!-- service discovery і resilience для HttpClient (Polly); 9.5 — RemoveAllResilienceHandlers для власних політик -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.5.0" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="9.0.0" />
     <!-- OpenTelemetry: трасування, метрики, експорт в Aspire Dashboard -->
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />

@@ -60,6 +60,8 @@ public sealed class AggregatedResponseCache(
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            // Graceful degradation: без Redis відповідь просто збирається заново з мікросервісів.
+            logger.LogWarning(ex, "Redis unavailable, aggregating {CacheKey} without cache", key);
             circuit.RecordFailure(ex);
             return null;
         }
@@ -86,6 +88,7 @@ public sealed class AggregatedResponseCache(
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            logger.LogWarning(ex, "Redis unavailable, aggregated response {CacheKey} not cached", key);
             circuit.RecordFailure(ex);
         }
         finally

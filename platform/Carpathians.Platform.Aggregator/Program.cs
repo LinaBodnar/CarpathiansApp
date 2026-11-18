@@ -6,11 +6,11 @@ using Carpathians.Catalog.Grpc;
 using Carpathians.Platform.Aggregator.Caching;
 using Carpathians.Platform.Aggregator.Clients;
 using Carpathians.Platform.Aggregator.Grpc;
+using Carpathians.Platform.Aggregator.Resilience;
 using Carpathians.Platform.Aggregator.Services;
 using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Reviews.Grpc;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Http.Resilience;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,32 +22,37 @@ builder.AddServiceDefaults();
 // Адреса — логічне ім'я ресурсу AppHost: service discovery працює так само, як для HttpClient у Лаб. 05.
 // "https": gRPC потребує HTTP/2, який Kestrel мікросервісу узгоджує через TLS (ALPN).
 // Фабрика клієнтів повторно використовує HTTP/2-з'єднання: паралельні виклики мультиплексуються в ньому.
+//
+// Resilience (Лаб. 07): стандартний обробник ServiceDefaults замінено політикою сервісу (без нашарування):
+// критичні catalog-api і booking-api — більше повторів і чутливіший circuit breaker,
+// некритичний reviews-api — один повтор і короткі таймаути (див. Resilience/DownstreamPolicies.cs).
+// Повтори за gRPC-статусами (UNAVAILABLE, RESOURCE_EXHAUSTED) — retry-політика каналу.
 builder.Services.AddSingleton<GrpcClientLoggingInterceptor>();
 
 builder.Services.AddGrpcClient<BookingGrpc.BookingGrpcClient>(o => o.Address = new Uri("https://booking-api"))
     .AddInterceptor<GrpcClientLoggingInterceptor>()
-    .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment));
+    .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment))
+    .AddDownstreamResilience(DownstreamPolicies.Booking, DownstreamTransport.Grpc)
+    .AddGrpcRetryPolicy(DownstreamPolicies.Booking);
 builder.Services.AddGrpcClient<CatalogGrpc.CatalogGrpcClient>(o => o.Address = new Uri("https://catalog-api"))
     .AddInterceptor<GrpcClientLoggingInterceptor>()
-    .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment));
+    .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment))
+    .AddDownstreamResilience(DownstreamPolicies.Catalog, DownstreamTransport.Grpc)
+    .AddGrpcRetryPolicy(DownstreamPolicies.Catalog);
 builder.Services.AddGrpcClient<ReviewsGrpc.ReviewsGrpcClient>(o => o.Address = new Uri("https://reviews-api"))
     .AddInterceptor<GrpcClientLoggingInterceptor>()
-    .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment));
+    .ConfigurePrimaryHttpMessageHandler(() => CreateGrpcHandler(builder.Environment))
+    .AddDownstreamResilience(DownstreamPolicies.Reviews, DownstreamTransport.Grpc)
+    .AddGrpcRetryPolicy(DownstreamPolicies.Reviews);
 
-// Typed HttpClients Лаб. 05 — лише для порівняння затримок HTTP і gRPC (HttpAggregationService).
-builder.Services.AddHttpClient<BookingClient>(c => c.BaseAddress = new Uri("https+http://booking-api"));
-builder.Services.AddHttpClient<CatalogClient>(c => c.BaseAddress = new Uri("https+http://catalog-api"));
-builder.Services.AddHttpClient<ReviewsClient>(c => c.BaseAddress = new Uri("https+http://reviews-api"));
-
-// Агрегатор не має чекати недоступний сервіс десятки секунд: одна повторна спроба й короткі таймаути
-// (стандартний resilience-обробник з ServiceDefaults; діє і для HTTP, і для gRPC-клієнтів).
-builder.Services.ConfigureAll<HttpStandardResilienceOptions>(o =>
-{
-    o.Retry.MaxRetryAttempts = 1;
-    o.Retry.Delay = TimeSpan.FromMilliseconds(200);
-    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(5);
-    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(10);
-});
+// Typed HttpClients Лаб. 05 — для порівняння затримок HTTP і gRPC (HttpAggregationService); ті самі політики,
+// повтори лише для безпечних методів.
+builder.Services.AddHttpClient<BookingClient>(c => c.BaseAddress = new Uri("https+http://booking-api"))
+    .AddDownstreamResilience(DownstreamPolicies.Booking, DownstreamTransport.Http);
+builder.Services.AddHttpClient<CatalogClient>(c => c.BaseAddress = new Uri("https+http://catalog-api"))
+    .AddDownstreamResilience(DownstreamPolicies.Catalog, DownstreamTransport.Http);
+builder.Services.AddHttpClient<ReviewsClient>(c => c.BaseAddress = new Uri("https+http://reviews-api"))
+    .AddDownstreamResilience(DownstreamPolicies.Reviews, DownstreamTransport.Http);
 
 // ---------- Кеш агрегованих відповідей у Redis (Лаб. 06) ----------
 // ConnectionStrings:redis передає AppHost; без нього Aggregator працює без кешу.
