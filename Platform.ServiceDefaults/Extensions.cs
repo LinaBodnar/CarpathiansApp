@@ -44,6 +44,13 @@ public static class Extensions
     /// <summary>Meter Polly: resilience.polly.strategy.events (OnRetry, OnCircuitOpened...), тривалість спроб і викликів.</summary>
     public const string ResilienceMeter = "Polly";
 
+    /// <summary>
+    /// ActivitySource асинхронного обміну повідомленнями (Лаб. 08, Platform.EventBus): span публікації (Producer)
+    /// і обробки (Consumer). Контекст передається через брокер у заголовку traceparent — trace
+    /// HTTP-запит -> публікація -> обробка в іншому сервісі -> БД стає наскрізним.
+    /// </summary>
+    public const string MessagingActivitySource = "Platform.Messaging";
+
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
@@ -144,6 +151,7 @@ public static class Extensions
                 .AddSource(builder.Environment.ApplicationName)       // власні spans сервісу (Activity API)
                 .AddSource("Carpathians.*")
                 .AddSource(MongoDbActivitySource)                     // MongoDB (Лаб. 04)
+                .AddSource(MessagingActivitySource)                   // RabbitMQ: publish / process (Лаб. 08)
                 .AddSource(GrpcClientActivitySource)                  // gRPC-клієнт (Лаб. 06): span виклику між клієнтом і HTTP/2-запитом
                 // службові перевірки стану (/health/*, /alive, gRPC health) не засмічують traces
                 .AddAspNetCoreInstrumentation(o => o.Filter = context =>

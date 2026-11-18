@@ -1,3 +1,5 @@
+using Carpathians.Platform.EventBus.Messaging;
+using Carpathians.Platform.EventBus.Publishing;
 using Carpathians.Platform.EventBus.Topology;
 using Carpathians.Platform.ServiceDefaults.Health;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +51,11 @@ public static class EventBusExtensions
 
         builder.Services.AddOptions<TopologyOptions>();
         builder.Services.AddHostedService<TopologyInitializer>();
+
+        // Publisher — singleton (тримає лише IConnection; канал створюється на кожну публікацію)
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton<CorrelationContext>();
+        builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
 
         return new EventBusBuilder(builder);
     }

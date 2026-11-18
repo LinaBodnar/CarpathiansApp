@@ -1,3 +1,4 @@
+using Carpathians.Dal.Outbox;
 using Carpathians.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,9 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : DbCo
     public DbSet<RoutePoint> RoutePoints => Set<RoutePoint>();
     public DbSet<GalleryImage> GalleryImages => Set<GalleryImage>();
     public DbSet<GearItem> GearItems => Set<GearItem>();
+
+    /// <summary>Transactional outbox: integration events, збережені разом зі змінами (Лаб. 08).</summary>
+    public DbSet<IntegrationEventLogEntry> IntegrationEventLog => Set<IntegrationEventLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

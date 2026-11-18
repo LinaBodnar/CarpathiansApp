@@ -2,6 +2,7 @@ using Carpathians.Api.Filters;
 using Carpathians.Catalog.Api.Caching;
 using Carpathians.Catalog.Api.Grpc;
 using Carpathians.Catalog.Api.HealthChecks;
+using Carpathians.Catalog.Api.IntegrationEvents;
 using Carpathians.Catalog.Api.Metrics;
 using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Api.Middleware;
@@ -76,6 +77,11 @@ builder.AddCatalogHealthChecks(connectionString);
 // Каталог — власник маршрутів і publisher: під час старту оголошує topic exchange catalog-events (+ DLX).
 builder.AddEventBus()
     .DeclareExchange(CatalogTopology.Exchange);
+
+// Integration events (Лаб. 08): RouteService фіксує подію в outbox (IntegrationEventLog) у транзакції зі змінами
+// і публікує її після коміту; фоновий CatalogOutboxPublisher дописує те, що не вдалося опублікувати одразу.
+builder.Services.AddScoped<ICatalogIntegrationEventService, CatalogIntegrationEventService>();
+builder.Services.AddHostedService<CatalogOutboxPublisher>();
 
 // L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
 builder.AddPlatformCaching();

@@ -8,10 +8,16 @@ using Carpathians.Domain.Exceptions;
 
 namespace Carpathians.Bll.Services;
 
-public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
+/// <summary>
+/// Бізнес-логіка маршрутів (Лаб. 03). Лаб. 08: створення, перейменування й видалення маршруту породжують
+/// integration events. Подія записується в outbox у ТІЙ САМІЙ транзакції, що й зміни, і публікується
+/// лише після успішного коміту (<see cref="SaveWithEventsAsync"/>).
+/// </summary>
+public class RouteService(IUnitOfWork uow, IMapper mapper, ICatalogIntegrationEventService events) : IRouteService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly IMapper _mapper = mapper;
+    private readonly ICatalogIntegrationEventService _events = events;
 
     public async Task<IReadOnlyList<RouteDto>> GetAllAsync(CancellationToken ct = default)
     {
@@ -82,8 +88,12 @@ public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
                 input.Detail.Requirements);
         }
 
-        await _uow.Routes.AddAsync(route, ct);
-        await _uow.SaveChangesAsync(ct);
+        await SaveWithEventsAsync(async token =>
+        {
+            await _uow.Routes.AddAsync(route, token);
+            await _uow.SaveChangesAsync(token);                 // Id маршруту потрібен для події
+            await _events.AddRouteCreatedAsync(route, token);
+        }, ct);
 
         return await GetByIdAsync(route.Id, ct);
     }
@@ -92,6 +102,8 @@ public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
     {
         var route = await _uow.Routes.GetWithDetailsEagerAsync(id, ct)
             ?? throw new EntityNotFoundException($"Route with ID {id} was not found");
+
+        var oldName = route.Name;
 
         route.Update(
             input.Name,
@@ -102,7 +114,20 @@ public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
             input.UpdatedBy);
 
         _uow.Routes.Update(route);
-        await _uow.SaveChangesAsync(ct);
+
+        // Подію породжує лише зміна назви — її копії тримають Бронювання (RouteRefs) і Відгуки (routeName).
+        if (!string.Equals(oldName, route.Name, StringComparison.Ordinal))
+        {
+            await SaveWithEventsAsync(async token =>
+            {
+                await _uow.SaveChangesAsync(token);
+                await _events.AddRouteRenamedAsync(route, oldName, token);
+            }, ct);
+        }
+        else
+        {
+            await _uow.SaveChangesAsync(ct);
+        }
 
         return _mapper.Map<RouteDto>(route);
     }
@@ -187,6 +212,37 @@ public class RouteService(IUnitOfWork uow, IMapper mapper) : IRouteService
 
         route.MarkDeleted(deletedBy);
         _uow.Routes.Update(route);
-        await _uow.SaveChangesAsync(ct);
+
+        await SaveWithEventsAsync(async token =>
+        {
+            await _uow.SaveChangesAsync(token);
+            await _events.AddRouteDeletedAsync(route, token);
+        }, ct);
+    }
+
+    /// <summary>
+    /// Межі транзакції для операцій з подіями:
+    /// <list type="number">
+    /// <item>зміни і запис події в outbox — одна транзакція БД (атомарно);</item>
+    /// <item>збій до коміту — відкат: ні змін, ні події;</item>
+    /// <item>лише після коміту — публікація в брокер. Збій публікації не скасовує вже збережену зміну:
+    /// подія лишається в outbox, і її опублікує фоновий процес.</item>
+    /// </list>
+    /// </summary>
+    private async Task SaveWithEventsAsync(Func<CancellationToken, Task> changes, CancellationToken ct)
+    {
+        await _uow.BeginTransactionAsync(ct: ct);
+        try
+        {
+            await changes(ct);
+            await _uow.CommitAsync(ct);
+        }
+        catch
+        {
+            await _uow.RollbackAsync(ct);
+            throw;
+        }
+
+        await _events.PublishPendingAsync(ct);
     }
 }
