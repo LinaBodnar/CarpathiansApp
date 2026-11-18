@@ -96,6 +96,75 @@ public sealed class BookingRepository : BaseDapperRepository<Booking>, IBookingR
             CommandType.StoredProcedure, ct)));
     }
 
+    public async Task<IReadOnlyList<Booking>> ListAsync(string? customerEmail, int skip, int take,
+                                                        CancellationToken ct = default)
+    {
+        // Спершу сторінка ідентифікаторів (OFFSET/FETCH), потім позиції лише цих бронювань — без дублювання рядків у пагінації.
+        const string sql = @"
+            WITH page AS (
+                SELECT b.Id, b.BookingDate
+                FROM dbo.Bookings b
+                JOIN dbo.Customers c ON c.Id = b.CustomerId
+                WHERE b.IsDeleted = 0 AND (@Email IS NULL OR c.Email = @Email)
+                ORDER BY b.BookingDate DESC, b.Id DESC
+                OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY)
+            SELECT b.Id, b.CustomerId, b.Status, b.BookingDate, b.TotalAmount,
+                   bd.ContactPhone, bd.MeetingPoint, bd.Comment,
+                   i.BookingId, i.DepartureId, i.RouteName, i.UnitPrice, i.Seats
+            FROM page p
+            JOIN dbo.Bookings b ON b.Id = p.Id
+            LEFT JOIN dbo.BookingDetails bd ON bd.BookingId = b.Id
+            LEFT JOIN dbo.BookingItems i ON i.BookingId = b.Id
+            ORDER BY p.BookingDate DESC, p.Id DESC";
+        await EnsureOpenAsync(ct);
+        var bookings = new Dictionary<long, Booking>();
+        await Connection.QueryAsync<Booking, BookingItem?, Booking>(
+            Cmd(sql, new { Email = customerEmail, Skip = skip, Take = take }, ct: ct),
+            (booking, item) =>
+            {
+                if (!bookings.TryGetValue(booking.Id, out var current))
+                    bookings[booking.Id] = current = booking;
+                if (item is not null)
+                    current.Items.Add(item);
+                return current;
+            },
+            splitOn: "BookingId");
+        return bookings.Values.ToList();
+    }
+
+    public async Task<int> CountAsync(string? customerEmail, CancellationToken ct = default)
+    {
+        const string sql = @"
+            SELECT COUNT(*)
+            FROM dbo.Bookings b
+            JOIN dbo.Customers c ON c.Id = b.CustomerId
+            WHERE b.IsDeleted = 0 AND (@Email IS NULL OR c.Email = @Email)";
+        await EnsureOpenAsync(ct);
+        return await Connection.ExecuteScalarAsync<int>(Cmd(sql, new { Email = customerEmail }, ct: ct));
+    }
+
+    public async Task<bool> UpdateDetailsAsync(long bookingId, string contactPhone, string meetingPoint, string? comment,
+                                               string? updatedBy, CancellationToken ct = default)
+    {
+        const string sql = @"
+            UPDATE dbo.Bookings SET UpdatedAt = SYSUTCDATETIME(), UpdatedBy = @UpdatedBy
+            WHERE Id = @BookingId AND IsDeleted = 0;
+            IF @@ROWCOUNT = 0
+            BEGIN
+                SELECT 0;
+                RETURN;
+            END
+            UPDATE dbo.BookingDetails
+            SET ContactPhone = @ContactPhone, MeetingPoint = @MeetingPoint, Comment = @Comment
+            WHERE BookingId = @BookingId;
+            SELECT 1;";
+        await EnsureOpenAsync(ct);
+        var updated = await GuardAsync(() => Connection.ExecuteScalarAsync<int>(Cmd(sql,
+            new { BookingId = bookingId, ContactPhone = contactPhone, MeetingPoint = meetingPoint, Comment = comment, UpdatedBy = updatedBy },
+            ct: ct)));
+        return updated == 1;
+    }
+
     public async Task<BookingStatistics> GetStatisticsAsync(CancellationToken ct = default)
     {
         // Легкі агрегати за індексованими полями: виконуються фоново раз на кілька десятків секунд, не на кожен запит.

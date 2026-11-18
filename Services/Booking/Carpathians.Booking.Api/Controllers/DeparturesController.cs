@@ -1,5 +1,6 @@
 ﻿using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
+using Carpathians.Platform.ServiceDefaults.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,15 +13,18 @@ namespace Carpathians.Api.Controllers;
 public class DeparturesController(IDepartureService departures) : ControllerBase
 {
     [HttpGet]
+    [RequirePermission(Permissions.Bookings.Read)]
     public async Task<ActionResult<IReadOnlyList<DepartureDto>>> GetAll(CancellationToken ct)
         => Ok(await departures.GetAllAsync(ct));
 
     [HttpGet("{id:long}")]
+    [RequirePermission(Permissions.Bookings.Read)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DepartureDto>> GetById(long id, CancellationToken ct)
         => Ok(await departures.GetByIdAsync(id, ct));
 
     [HttpPost]
+    [RequirePermission(Permissions.Bookings.Update)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -31,6 +35,7 @@ public class DeparturesController(IDepartureService departures) : ControllerBase
     }
 
     [HttpPut("{id:long}")]
+    [RequirePermission(Permissions.Bookings.Update)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DepartureDto>> Update(
@@ -38,6 +43,7 @@ public class DeparturesController(IDepartureService departures) : ControllerBase
         => Ok(await departures.UpdateAsync(id, input, ct));
 
     [HttpDelete("{id:long}")]
+    [RequirePermission(Permissions.Bookings.Delete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(long id, CancellationToken ct)

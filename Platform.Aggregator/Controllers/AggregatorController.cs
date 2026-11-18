@@ -1,5 +1,6 @@
 using Carpathians.Platform.Aggregator.Models;
 using Carpathians.Platform.Aggregator.Services;
+using Carpathians.Platform.ServiceDefaults.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +23,7 @@ public class AggregatorController(AggregationService aggregation, TransportBench
     /// 200 з частковими даними й переліком Warnings.
     /// </summary>
     [HttpGet("bookings/{id:long}/full")]
+    [RequirePermission(Permissions.Bookings.Read)]
     [ProducesResponseType(typeof(FullBookingDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
@@ -45,6 +47,7 @@ public class AggregatorController(AggregationService aggregation, TransportBench
 
     /// <summary>Огляд маршруту: catalog-api і reviews-api паралельно.</summary>
     [HttpGet("routes/{routeId:long}/overview")]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(RouteOverviewDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RouteOverviewDto>> GetRouteOverview(long routeId, CancellationToken ct)
@@ -62,6 +65,7 @@ public class AggregatorController(AggregationService aggregation, TransportBench
     /// середнє, медіана, p95, мінімум і максимум у мілісекундах; кеш агрегованих відповідей не використовується.
     /// </summary>
     [HttpGet("benchmark/bookings/{id:long}")]
+    [RequirePermission(Permissions.Bookings.Read)]
     [ProducesResponseType(typeof(TransportComparisonDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TransportComparisonDto>> CompareTransports(

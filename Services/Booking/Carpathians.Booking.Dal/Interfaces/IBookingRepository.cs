@@ -12,6 +12,15 @@ public interface IBookingRepository : IGenericRepository<Booking>
     Task<long> PayAsync(long bookingId, string method, string? paidBy, CancellationToken ct = default);
     Task CancelAsync(long bookingId, string? changedBy, CancellationToken ct = default);
 
+    /// <summary>Сторінка бронювань з позиціями (Лаб. 09); customerEmail = null — усі бронювання.</summary>
+    Task<IReadOnlyList<Booking>> ListAsync(string? customerEmail, int skip, int take, CancellationToken ct = default);
+
+    Task<int> CountAsync(string? customerEmail, CancellationToken ct = default);
+
+    /// <summary>Оновлення контактних даних бронювання (BookingDetails); false — бронювання не існує.</summary>
+    Task<bool> UpdateDetailsAsync(long bookingId, string contactPhone, string meetingPoint, string? comment,
+        string? updatedBy, CancellationToken ct = default);
+
     /// <summary>Знімок стану для gauge-метрик (Лаб. 07): кількість бронювань за статусами й вільні місця майбутніх виїздів.</summary>
     Task<BookingStatistics> GetStatisticsAsync(CancellationToken ct = default);
 }

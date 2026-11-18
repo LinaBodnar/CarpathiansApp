@@ -10,6 +10,9 @@
   <Folder Name="/Services/Auth/">
     <Project Path="Services/Auth/Carpathians.Auth.Api/Carpathians.Auth.Api.csproj" />
   </Folder>
+  <Folder Name="/Services/Payments/">
+    <Project Path="Services/Payments/Carpathians.Payments.Api/Carpathians.Payments.Api.csproj" />
+  </Folder>
   <Folder Name="/Services/Booking/">
     <Project Path="Services/Booking/Carpathians.Booking.Api/Carpathians.Booking.Api.csproj" />
     <Project Path="Services/Booking/Carpathians.Booking.Bll/Carpathians.Booking.Bll.csproj" />

@@ -28,6 +28,8 @@ builder.AddServiceDefaults();
 
 // Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
 builder.AddPlatformAuthentication();
+// Permission-based авторизація: політика на кожен permission, рішення приймається локально за claims токена
+builder.AddPermissionAuthorization();
 
 var connectionString = builder.Configuration.GetConnectionString("CatalogDb")
                        ?? throw new InvalidOperationException("Connection string 'CatalogDb' is missing");

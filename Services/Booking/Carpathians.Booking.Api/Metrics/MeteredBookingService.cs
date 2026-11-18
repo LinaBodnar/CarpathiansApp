@@ -38,4 +38,13 @@ public sealed class MeteredBookingService(IBookingService inner, BookingMetrics 
         await metrics.MeasureAsync(BookingMetrics.Operations.Cancel, () => inner.CancelAsync(id, ct));
         metrics.BookingCancelled();
     }
+
+    public Task<BookingPageDto> GetListAsync(BookingListQuery query, CancellationToken ct)
+        => metrics.MeasureAsync(BookingMetrics.Operations.List, () => inner.GetListAsync(query, ct));
+
+    public Task<BookingDto> UpdateAsync(long id, UpdateBookingDto input, CancellationToken ct)
+        => metrics.MeasureAsync(BookingMetrics.Operations.Update, () => inner.UpdateAsync(id, input, ct));
+
+    public Task DeleteAsync(long id, CancellationToken ct)
+        => metrics.MeasureAsync(BookingMetrics.Operations.Delete, () => inner.DeleteAsync(id, ct));
 }

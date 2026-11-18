@@ -18,6 +18,11 @@ public class TrailRoute
     public DateTime? UpdatedAt { get; private set; }
     public string? UpdatedBy { get; private set; }
     public bool IsDeleted { get; private set; }
+
+    /// <summary>Маршрут опубліковано (Лаб. 09: дія routes:publish — manager і admin).</summary>
+    public bool IsPublished { get; private set; }
+    public DateTime? PublishedAt { get; private set; }
+    public string? PublishedBy { get; private set; }
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     public Region Region { get; private set; } = null!;
@@ -94,6 +99,18 @@ public class TrailRoute
             throw new DomainException($"Point with ID {pointId} is not linked to this route");
 
         RoutePoints.Remove(rp);
+    }
+
+    /// <summary>Публікація маршруту. Повторна публікація — бізнес-конфлікт.</summary>
+    public void Publish(string? publishedBy = null)
+    {
+        if (IsPublished)
+            throw new ConflictException($"Route '{Name}' is already published");
+
+        IsPublished = true;
+        PublishedAt = DateTime.UtcNow;
+        PublishedBy = publishedBy;
+        Touch(publishedBy);
     }
 
     public void MarkDeleted(string? updatedBy = null)

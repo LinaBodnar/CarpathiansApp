@@ -1,5 +1,6 @@
 using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
+using Carpathians.Platform.ServiceDefaults.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,6 +16,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     private readonly ILogger<RoutesController> _logger = logger;
 
     [HttpGet]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(PagedResult<RouteDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResult<RouteDto>>> GetAll(
         [FromQuery] RouteQueryParameters queryParams,
@@ -34,6 +36,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpGet("popular-challenging")]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(IReadOnlyList<RouteDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RouteDto>>> GetPopularChallenging(CancellationToken ct)
     {
@@ -42,6 +45,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpGet("{id:long}")]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RouteDto>> GetById(long id, CancellationToken ct)
@@ -51,6 +55,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpGet("{id:long}/explicit")]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RouteDto>> GetWithDetailsExplicit(long id, CancellationToken ct)
@@ -60,6 +65,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpPost]
+    [RequirePermission(Permissions.Routes.Create)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -72,6 +78,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpPut("{id:long}")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -83,6 +90,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpPut("{id:long}/detail")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -94,6 +102,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpPost("{id:long}/gear")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -105,6 +114,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpDelete("{id:long}/gear/{gearItemId:long}")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RouteDto>> RemoveGearItem(long id, long gearItemId, CancellationToken ct)
@@ -114,6 +124,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpPost("{id:long}/points")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -125,6 +136,7 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpDelete("{id:long}/points/{pointId:long}")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RouteDto>> RemovePoint(long id, long pointId, CancellationToken ct)
@@ -134,12 +146,28 @@ public class RoutesController(IRouteService routes, ILogger<RoutesController> lo
     }
 
     [HttpDelete("{id:long}")]
+    [RequirePermission(Permissions.Routes.Delete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(long id, [FromQuery] string? deletedBy, CancellationToken ct)
     {
-        _logger.LogInformation("Deleting route with ID {Id} by {DeletedBy}", id, deletedBy);
-        await _routes.DeleteAsync(id, deletedBy, ct);
+        // Лаб. 09: автор видалення — ім'я з перевіреного токена (параметр запиту — лише для запуску без токена).
+        var by = User.Identity?.Name ?? deletedBy;
+        _logger.LogInformation("Deleting route with ID {Id} by {DeletedBy}", id, by);
+        await _routes.DeleteAsync(id, by, ct);
         return NoContent();
+    }
+
+    /// <summary>Публікація маршруту (Лаб. 09): manager і admin. Повторна публікація — 409.</summary>
+    [HttpPost("{id:long}/publish")]
+    [RequirePermission(Permissions.Routes.Publish)]
+    [ProducesResponseType(typeof(RouteDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<RouteDto>> Publish(long id, CancellationToken ct)
+    {
+        var published = await _routes.PublishAsync(id, User.Identity?.Name, ct);
+        _logger.LogInformation("Route {Id} published by {UserName}", id, User.Identity?.Name);
+        return Ok(published);
     }
 }

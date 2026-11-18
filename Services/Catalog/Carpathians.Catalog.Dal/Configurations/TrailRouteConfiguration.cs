@@ -50,6 +50,9 @@ public class TrailRouteConfiguration : IEntityTypeConfiguration<TrailRoute>
         builder.Property(r => r.UpdatedBy)
             .HasMaxLength(100);
 
+        builder.Property(r => r.PublishedBy)
+            .HasMaxLength(100);
+
         builder.Property(r => r.RowVersion)
             .IsRowVersion();
 

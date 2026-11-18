@@ -1,5 +1,6 @@
 using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
+using Carpathians.Platform.ServiceDefaults.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,17 +15,20 @@ public class RegionsController(IRegionService regions) : ControllerBase
     private readonly IRegionService _regions = regions;
 
     [HttpGet]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(IReadOnlyList<RegionDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RegionDto>>> GetAll(CancellationToken ct)
         => Ok(await _regions.GetAllAsync(ct));
 
     [HttpGet("{id:int}")]
+    [RequirePermission(Permissions.Routes.Read)]
     [ProducesResponseType(typeof(RegionDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RegionDto>> GetById(int id, CancellationToken ct)
         => Ok(await _regions.GetByIdAsync(id, ct));
 
     [HttpPost]
+    [RequirePermission(Permissions.Routes.Create)]
     [ProducesResponseType(typeof(RegionDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -35,6 +39,7 @@ public class RegionsController(IRegionService regions) : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.Routes.Update)]
     [ProducesResponseType(typeof(RegionDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -43,6 +48,7 @@ public class RegionsController(IRegionService regions) : ControllerBase
         => Ok(await _regions.UpdateAsync(id, input, ct));
 
     [HttpDelete("{id:int}")]
+    [RequirePermission(Permissions.Routes.Delete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

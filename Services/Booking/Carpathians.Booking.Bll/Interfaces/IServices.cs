@@ -26,4 +26,9 @@ public interface IBookingService
     Task ConfirmAsync(long id, CancellationToken ct);                             
     Task<PaymentResultDto> PayAsync(long id, PayBookingDto input, CancellationToken ct);
     Task CancelAsync(long id, CancellationToken ct);
+
+    // Лаб. 09: список (власні або всі), оновлення контактних даних, видалення
+    Task<BookingPageDto> GetListAsync(BookingListQuery query, CancellationToken ct);
+    Task<BookingDto> UpdateAsync(long id, UpdateBookingDto input, CancellationToken ct);
+    Task DeleteAsync(long id, CancellationToken ct);
 }

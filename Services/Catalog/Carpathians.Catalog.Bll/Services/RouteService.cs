@@ -220,6 +220,17 @@ public class RouteService(IUnitOfWork uow, IMapper mapper, ICatalogIntegrationEv
         }, ct);
     }
 
+    public async Task<RouteDto> PublishAsync(long id, string? publishedBy = null, CancellationToken ct = default)
+    {
+        var route = await _uow.Routes.GetByIdAsync(id, ct)
+            ?? throw new EntityNotFoundException($"Route with ID {id} was not found");
+
+        route.Publish(publishedBy);
+        _uow.Routes.Update(route);
+        await _uow.SaveChangesAsync(ct);
+        return await GetByIdAsync(id, ct);
+    }
+
     /// <summary>
     /// Межі транзакції для операцій з подіями:
     /// <list type="number">

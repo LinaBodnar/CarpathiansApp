@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Services\Catalog\Carpathians.Catalog.Api\Carpathians.Catalog.Api.csproj" />
     <ProjectReference Include="..\Services\Reviews\Carpathians.Reviews.WebApi\Carpathians.Reviews.WebApi.csproj" />
     <ProjectReference Include="..\Services\Auth\Carpathians.Auth.Api\Carpathians.Auth.Api.csproj" />
+    <ProjectReference Include="..\Services\Payments\Carpathians.Payments.Api\Carpathians.Payments.Api.csproj" />
     <ProjectReference Include="..\Platform.ApiGateway\Carpathians.Platform.ApiGateway.csproj" />
     <ProjectReference Include="..\Platform.Aggregator\Carpathians.Platform.Aggregator.csproj" />
   </ItemGroup>

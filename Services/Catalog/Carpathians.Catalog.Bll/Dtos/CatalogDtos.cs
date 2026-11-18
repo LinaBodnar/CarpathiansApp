@@ -163,7 +163,10 @@ public record RouteDto(
     string? UpdatedBy,
     RouteDetailDto? Detail,
     IReadOnlyList<GearItemDto> GearItems,
-    IReadOnlyList<RoutePointDto> RoutePoints);
+    IReadOnlyList<RoutePointDto> RoutePoints,
+    bool IsPublished = false,
+    DateTime? PublishedAt = null,
+    string? PublishedBy = null);
 
 public record CreateRouteDto(
     [property: Required(ErrorMessage = "Region ID is required.")]

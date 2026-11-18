@@ -28,6 +28,9 @@ public sealed class BookingMetrics
         public const string Confirm = "confirm";
         public const string Pay = "pay";
         public const string Cancel = "cancel";
+        public const string List = "list";
+        public const string Update = "update";
+        public const string Delete = "delete";
     }
 
     private const string StatusTag = "booking.status";

@@ -70,6 +70,9 @@ public sealed class MeteredRouteService(IRouteService inner, CatalogMetrics metr
         metrics.RouteDeleted();
     }
 
+    public Task<RouteDto> PublishAsync(long id, string? publishedBy = null, CancellationToken ct = default)
+        => metrics.MeasureAsync(Ops.RoutePublish, () => inner.PublishAsync(id, publishedBy, ct));
+
     /// <summary>Будь-яка зміна маршруту (поля, деталі, спорядження, точки) — одна операція route.update.</summary>
     private async Task<RouteDto> Updated(Func<Task<RouteDto>> update)
     {

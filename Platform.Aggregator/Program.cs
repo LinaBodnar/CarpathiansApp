@@ -23,6 +23,8 @@ builder.AddServiceDefaults();
 
 // Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
 builder.AddPlatformAuthentication();
+// Permission-based авторизація: політика на кожен permission, рішення приймається локально за claims токена
+builder.AddPermissionAuthorization();
 
 // ---------- gRPC-клієнти мікросервісів (Лаб. 06) ----------
 // Адреса — логічне ім'я ресурсу AppHost: service discovery працює так само, як для HttpClient у Лаб. 05.

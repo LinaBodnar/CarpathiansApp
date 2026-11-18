@@ -116,6 +116,28 @@ public sealed class CachedBookingService(BookingService inner, ICacheService cac
         await cache.InvalidateAsync(keys, "BookingCancelled", ct);
     }
 
+    /// <summary>Список не кешується: залежить від користувача (власні бронювання) і швидко змінюється.</summary>
+    public Task<BookingPageDto> GetListAsync(BookingListQuery query, CancellationToken ct) => inner.GetListAsync(query, ct);
+
+    public async Task<BookingDto> UpdateAsync(long id, UpdateBookingDto input, CancellationToken ct)
+    {
+        var updated = await inner.UpdateAsync(id, input, ct);
+        await cache.InvalidateAsync("BookingUpdated", ct, BookingCacheKeys.Booking(id), AggregatorCacheKeys.FullBooking(id));
+        return updated;
+    }
+
+    public async Task DeleteAsync(long id, CancellationToken ct)
+    {
+        // Позиції читаються до видалення: активне бронювання скасовується, місця повертаються у виїзди.
+        var booking = await inner.GetByIdAsync(id, ct);
+        await inner.DeleteAsync(id, ct);
+
+        var keys = SeatKeys(booking);
+        keys.Add(BookingCacheKeys.Booking(id));
+        keys.Add(AggregatorCacheKeys.FullBooking(id));
+        await cache.InvalidateAsync(keys, "BookingDeleted", ct);
+    }
+
     /// <summary>Виїзди позицій бронювання + список виїздів (вільні місця змінилися).</summary>
     private static List<string> SeatKeys(BookingDto booking)
     {

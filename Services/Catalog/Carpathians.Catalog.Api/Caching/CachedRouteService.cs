@@ -112,6 +112,13 @@ public sealed class CachedRouteService(RouteService inner, ICacheService cache) 
 
     // ---------- Допоміжне ----------
 
+    public async Task<RouteDto> PublishAsync(long id, string? publishedBy = null, CancellationToken ct = default)
+    {
+        var published = await inner.PublishAsync(id, publishedBy, ct);
+        await InvalidateRouteAsync(id, "RoutePublished", ct);
+        return published;
+    }
+
     private Task<string> ListsVersionAsync(CancellationToken ct)
         => cache.GetVersionAsync(CatalogCacheKeys.RoutesVersion, CatalogCachePolicies.ListVersion, ct);
 

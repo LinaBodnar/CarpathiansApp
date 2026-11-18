@@ -101,6 +101,11 @@ var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-a
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithHttpHealthCheck("/health");
 
+// Платежі (Лаб. 09): демо-сервіс для перевірки доступу — усі endpoints лише для admin.
+var payments = builder.AddProject<Projects.Carpathians_Payments_Api>("payments-api", launchProfileName: "https")
+    .WithEnvironment("Jwt__SecretKey", jwtSecret)
+    .WithHttpHealthCheck("/health");
+
 // ---------- Aggregator: паралельні gRPC-виклики мікросервісів + кеш агрегованих відповідей у Redis ----------
 
 var aggregator = builder.AddProject<Projects.Carpathians_Platform_Aggregator>("aggregator")
@@ -124,6 +129,7 @@ builder.AddProject<Projects.Carpathians_Platform_ApiGateway>("gateway")
     .WithReference(catalog)
     .WithReference(reviews)
     .WithReference(auth)
+    .WithReference(payments)
     .WithReference(aggregator)
     .WaitFor(auth)
     .WaitFor(aggregator)

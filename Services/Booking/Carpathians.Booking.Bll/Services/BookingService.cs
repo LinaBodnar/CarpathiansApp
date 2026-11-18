@@ -103,4 +103,44 @@ public sealed class BookingService(IUnitOfWork uow, IMapper mapper) : IBookingSe
 
     public Task CancelAsync(long id, CancellationToken ct)
         => uow.Bookings.CancelAsync(id, Actor, ct);
+
+    public async Task<BookingPageDto> GetListAsync(BookingListQuery query, CancellationToken ct)
+    {
+        var page = Math.Max(query.Page, 1);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+
+        var items = await uow.Bookings.ListAsync(query.CustomerEmail, (page - 1) * pageSize, pageSize, ct);
+        var total = await uow.Bookings.CountAsync(query.CustomerEmail, ct);
+        return new BookingPageDto(mapper.Map<List<BookingDto>>(items), page, pageSize, total);
+    }
+
+    public async Task<BookingDto> UpdateAsync(long id, UpdateBookingDto input, CancellationToken ct)
+    {
+        var booking = await uow.Bookings.GetWithItemsAsync(id, ct)
+            ?? throw new NotFoundException($"Booking {id} not found");
+        if (booking.Status is BookingStatus.Cancelled or BookingStatus.Completed)
+            throw new BusinessConflictException($"Booking {id} is {booking.Status} and cannot be changed");
+
+        if (!await uow.Bookings.UpdateDetailsAsync(id, input.ContactPhone, input.MeetingPoint, input.Comment, Actor, ct))
+            throw new NotFoundException($"Booking {id} not found");
+        return await GetByIdAsync(id, ct);
+    }
+
+    /// <summary>
+    /// Видалення (soft delete). Активне бронювання спершу скасовується — місця повертаються у виїзди;
+    /// оплачене видалити не можна (спершу повернення коштів).
+    /// </summary>
+    public async Task DeleteAsync(long id, CancellationToken ct)
+    {
+        var booking = await uow.Bookings.GetWithItemsAsync(id, ct)
+            ?? throw new NotFoundException($"Booking {id} not found");
+        if (booking.Status == BookingStatus.Paid)
+            throw new BusinessConflictException($"Booking {id} is paid; refund it before deleting");
+
+        if (booking.Status is BookingStatus.Submitted or BookingStatus.AwaitingValidation or BookingStatus.SeatsConfirmed)
+            await uow.Bookings.CancelAsync(id, Actor, ct);
+
+        if (!await uow.Bookings.DeleteAsync(id, ct))
+            throw new NotFoundException($"Booking {id} not found");
+    }
 }

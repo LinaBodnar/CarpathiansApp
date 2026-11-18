@@ -27,6 +27,7 @@ public sealed class CatalogMetrics
         public const string RouteCreate = "route.create";
         public const string RouteUpdate = "route.update";
         public const string RouteDelete = "route.delete";
+        public const string RoutePublish = "route.publish";
         public const string PointGet = "point.get";
         public const string PointCreate = "point.create";
         public const string PointUpdate = "point.update";

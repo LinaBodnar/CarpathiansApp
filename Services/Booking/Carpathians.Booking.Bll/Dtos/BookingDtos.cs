@@ -29,3 +29,16 @@ public class PayBookingDto
 }
 
 public record PaymentResultDto(long PaymentId);
+
+/// <summary>Сторінка бронювань (Лаб. 09): CustomerEmail = null — усі бронювання, інакше — лише власні.</summary>
+public sealed record BookingListQuery(string? CustomerEmail, int Page = 1, int PageSize = 20);
+
+public sealed record BookingPageDto(IReadOnlyList<BookingDto> Items, int Page, int PageSize, int TotalCount);
+
+/// <summary>Оновлення контактних даних бронювання (PUT /api/bookings/{id}).</summary>
+public class UpdateBookingDto
+{
+    [Required, StringLength(30, MinimumLength = 5)] public string ContactPhone { get; set; } = "";
+    [Required, StringLength(400)] public string MeetingPoint { get; set; } = "";
+    [StringLength(1000)] public string? Comment { get; set; }
+}

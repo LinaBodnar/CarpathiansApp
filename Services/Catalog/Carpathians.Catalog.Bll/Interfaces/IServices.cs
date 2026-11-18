@@ -18,6 +18,9 @@ public interface IRouteService
     Task<RouteDto> AddPointAsync(long id, AddRoutePointDto input, CancellationToken ct = default);
     Task<RouteDto> RemovePointAsync(long id, long pointId, CancellationToken ct = default);
     Task DeleteAsync(long id, string? deletedBy = null, CancellationToken ct = default);
+
+    /// <summary>Публікація маршруту (Лаб. 09, permission routes:publish).</summary>
+    Task<RouteDto> PublishAsync(long id, string? publishedBy = null, CancellationToken ct = default);
 }
 
 public interface IPointService
