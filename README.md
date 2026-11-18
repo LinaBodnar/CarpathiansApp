@@ -23,19 +23,19 @@ Carpathians - веб-платформа для любителів активно
 ├── README.md
 ├── Platform.slnx                       # одне рішення на всю платформу
 ├── Platform.AppHost/                   # оркестрація Aspire (AppHost.cs) — Проєкт №5
-├── Platform.ServiceDefaults/           # Serilog, OpenTelemetry, CorrelationId, resilience, health checks, кеш
+├── Platform.ServiceDefaults/           # Extensions.cs: Serilog, OpenTelemetry, resilience, health endpoints, Meter-и; кеш
 ├── Platform.ApiGateway/                # YARP — єдина точка входу
-├── Platform.Aggregator/                # gRPC-/HTTP-клієнти, агрегація, кеш агрегатів, політики стійкості
+├── Platform.Aggregator/                # gRPC-/HTTP-клієнти, агрегація, кеш агрегатів, Resilience/, Metrics/, HealthChecks/
 ├── Protos/common/                      # спільні типи gRPC-контрактів (DecimalValue)
 ├── Services/
 │   ├── Booking/                        # Проєкт №1 — ADO.NET + Dapper (Лаб. 02)
-│   │   ├── Carpathians.Booking.Api/    # контролери, Protos/, Grpc/, Caching/, Program.cs
+│   │   ├── Carpathians.Booking.Api/    # контролери, Protos/, Grpc/, Caching/, Metrics/, HealthChecks/, Program.cs
 │   │   ├── Carpathians.Booking.Bll/
 │   │   ├── Carpathians.Booking.Dal/
 │   │   ├── Carpathians.Booking.Domain/
 │   │   └── Carpathians.Booking.Tests/
 │   ├── Catalog/                        # Проєкт №2 — EF Core (Лаб. 03)
-│   │   ├── Carpathians.Catalog.Api/    # + Dockerfile
+│   │   ├── Carpathians.Catalog.Api/    # та сама будова, що й Booking.Api, + Dockerfile
 │   │   ├── Carpathians.Catalog.Bll/
 │   │   ├── Carpathians.Catalog.Dal/    # DbContext, Configurations/, Migrations/
 │   │   ├── Carpathians.Catalog.Domain/
@@ -44,7 +44,7 @@ Carpathians - веб-платформа для любителів активно
 │       ├── Carpathians.Reviews.Domain/
 │       ├── Carpathians.Reviews.Application/
 │       ├── Carpathians.Reviews.Infrastructure/
-│       ├── Carpathians.Reviews.WebApi/
+│       ├── Carpathians.Reviews.WebApi/ # контролери, Grpc/, Caching/, Metrics/, HealthChecks/, Program.cs
 │       └── Carpathians.Reviews.Tests/
 ├── db/
 │   ├── p1/                             # BookingContext (SQL Server)
@@ -571,3 +571,184 @@ dotnet run --project Platform.AppHost
 
 Повний опис — [`docs/platform.md`](docs/platform.md#8-grpc-і-кешування-лаб-06). Запуск — так само, як у Проєкті №5.
 
+## Проєкт №7 — Resilience, бізнес-метрики та health checks
+
+Платформу з Лаб. 05–06 розширено механізмами стійкості й спостережуваності:
+
+- **Resilience** для всіх HTTP- і gRPC-клієнтів Aggregator. Standard Resilience Handler з ServiceDefaults
+  у кожного клієнта замінено політикою сервісу (`RemoveAllResilienceHandlers` → `AddStandardResilienceHandler`),
+  тож обробники не нашаровуються. Додатково gRPC-клієнти мають retry-політику каналу за gRPC-статусами.
+- **Graceful degradation кешу.** Якщо Redis недоступний, сервіс читає з L1 і бази даних, пише попередження в лог,
+  а health check показує `Degraded`.
+- **Бізнес-метрики** через `IMeterFactory`: лічильники, гістограми тривалості й gauge у кожному сервісі та в Aggregator.
+- **Health checks** для SQL Server, MongoDB, Redis (`Degraded`) і gRPC-залежностей. Liveness, readiness і startup
+  розділено, відповіді містять JSON з деталями кожної перевірки. Dashboard показує стан ресурсів через `WithHttpHealthCheck`.
+
+| Що | Де |
+|---|---|
+| Політики клієнтів | `Platform.Aggregator/Resilience/DownstreamPolicies.cs`, `DownstreamResilience.cs` |
+| Метрики Aggregator, стан circuit breaker | `Platform.Aggregator/Metrics/` |
+| Health checks залежностей Aggregator | `Platform.Aggregator/HealthChecks/` |
+| Бізнес-метрики сервісів | `Services/*/*.Api/Metrics/`, `Services/Reviews/Carpathians.Reviews.WebApi/Metrics/` |
+| Health checks сервісів | `Services/*/*.Api/HealthChecks/`, `Services/Reviews/Carpathians.Reviews.WebApi/HealthChecks/` |
+| Meter, теги, кошики гістограм, health endpoints | `Platform.ServiceDefaults/Extensions.cs`, `Metrics/`, `Health/` |
+| Імітація збоїв `/dev/faults` (Development) | `Platform.ServiceDefaults/Resilience/FaultInjection.cs` |
+
+### 1. Політики resilience клієнтів Aggregator
+
+Критичні сервіси — **Каталог** і **Бронювання**: без них картку бронювання не зібрати, Aggregator відповідає 503.
+Для них важливіше дочекатися відповіді, тож повторів більше, а таймаути довші. Circuit breaker розмикається вже
+при 30 % збоїв, щоб швидко зняти навантаження з сервісу, якому погано.
+
+**Відгуки** — некритичний сервіс: без рейтингу й відгуків Aggregator повертає часткову відповідь (`warnings`).
+Чекати на нього довго немає сенсу, тож політика коротка: один повтор і малі таймаути. Ланцюг розмикається лише
+при систематичних збоях (70 %), але потім довше лишається розімкненим. Поки сервіс лежить, Aggregator миттєво
+віддає часткову відповідь і не витрачає час на таймаути.
+
+| Параметр | catalog-api | booking-api | reviews-api | Обґрунтування |
+|---|---|---|---|---|
+| Критичність | так | так | ні | без каталогу й бронювання відповідь неможлива; без відгуків — часткова |
+| Retry (HTTP-рівень) | 3 повтори | 2 повтори | 1 повтор | критичним — більше шансів переждати тимчасовий збій |
+| Затримка retry | 200 мс, експон., jitter | 200 мс, експон., jitter | 100 мс, експон., jitter | jitter розносить повтори клієнтів у часі (thundering herd) |
+| Таймаут спроби | 2 с | 2 с | 1 с | типова відповідь — десятки мс; повільніше вважаємо збоєм |
+| Загальний таймаут | 10 с | 8 с | 3 с | ≥ найгіршого часу всіх спроб: 9.4 с / 6.6 с / 2.1 с (перевіряє `Validate()`) |
+| CB: частка збоїв | 30 % | 30 % | 70 % | критичні — швидкий fail-fast; відгуки — лише при систематичних збоях |
+| CB: мін. запитів / вікно | 10 / 30 с | 10 / 30 с | 10 / 20 с | не розмикатися через 1–2 випадкові помилки при малому трафіку |
+| CB: розімкнений | 15 с | 15 с | 30 с | критичні перевіряємо частіше; відгуки довше не турбуємо |
+| gRPC retry: спроб | 4 | 3 | 2 | за статусами `UNAVAILABLE`, `RESOURCE_EXHAUSTED` |
+| gRPC backoff | 0.2–2 с | 0.2–2 с | 0.1–0.5 с | `RetryThrottling` (10 токенів, 0.1) вимикає повтори при масових збоях |
+| Deadline gRPC-виклику | 10 с | 8 с | 3 с | = загальний таймаут: повтори обох рівнів не тривають довше |
+| Повтор POST (HTTP) | ні | ні | ні | `DisableForUnsafeHttpMethods`: зміни не дублюються; gRPC-виклики Aggregator лише читають |
+
+**Чому два рівні повторів для gRPC.** gRPC повертає `UNAVAILABLE` чи `DEADLINE_EXCEEDED` статусом у трейлерах
+при HTTP 200, тому HTTP-обробник їх не бачить. Він повторює лише мережеві збої, 5xx і таймаути, а повтори
+за gRPC-статусами робить retry-політика каналу (`ServiceConfig.MethodConfigs`).
+
+**Логи переходів circuit breaker.** `OnOpened` — Error, `OnHalfOpened` — Warning, `OnClosed` — Information,
+категорія `Carpathians.Aggregator.Resilience`. Повтори й таймаути Polly логує сам (категорія `Polly`).
+
+### 2. Бізнес-метрики
+
+Для кожного сервісу Meter створюється через `IMeterFactory` в окремому класі метрик (Singleton). Назва Meter
+збігається з назвою сервісу, і всі вони додані в OpenTelemetry через `AddMeter` у ServiceDefaults.
+Тривалість записується для **всіх** виконань, включно з невдалими. Лічильник збільшується одразу після успішної операції.
+Gauge читає знімок стану, який фоновий сервіс оновлює раз на 30 с. Callback gauge не звертається до бази.
+
+| Meter | Інструмент | Тип | Теги |
+|---|---|---|---|
+| `Booking.Api` | `bookings.created` | Counter | `booking.status` |
+| | `bookings.confirmed`, `bookings.cancelled` | Counter | — |
+| | `bookings.paid` | Counter | `payment.method` (Card / Cash / Transfer) |
+| | `bookings.seats.reserved`, `bookings.amount` (UAH) | Counter | — |
+| | `bookings.operation.duration` (мс) | Histogram | `operation`, `status`, `error.type` |
+| | `bookings.current` | ObservableGauge | `booking.status` |
+| | `departures.seats.available` | ObservableGauge | — |
+| `Catalog.Api` | `routes.created`, `routes.updated` | Counter | `route.difficulty` |
+| | `routes.deleted` | Counter | — |
+| | `routes.searches` | Counter | `search.type` (all / paged / popular_challenging) |
+| | `points.created` | Counter | `point.type` |
+| | `catalog.operation.duration` (мс) | Histogram | `operation`, `status`, `error.type` |
+| | `routes.active` / `points.active` | ObservableGauge | `route.difficulty` / `point.type` |
+| `Reviews.Api` | `reviews.created` | Counter | `review.rating` (1–5) |
+| | `reviews.updated`, `reviews.deleted`, `reviews.comments.added`, `discussions.created`, `discussions.messages.posted` | Counter | — |
+| | `reviews.operation.duration` (мс) | Histogram | `operation` (команда/запит CQRS), `operation.kind`, `status`, `error.type` |
+| | `reviews.current` / `discussions.current` | ObservableGauge | `review.rating` / — |
+| `Aggregator.Api` | `aggregator.requests` | Counter | `operation`, `aggregation.result`, `cache.result`, `status` |
+| | `aggregator.request.duration` (мс) | Histogram | ті самі |
+| | `aggregator.downstream.failures` | Counter | `downstream.service`, `rpc.grpc.status` |
+| | `aggregator.circuit.state` | ObservableGauge | `downstream.service`, `transport` (0 closed / 1 half-open / 2 open) |
+
+**Теги однакові в усіх сервісах:**
+- `operation` — фіксований перелік операцій сервісу;
+- `status` — `success` / `failure`;
+- `error.type` — `not_found` / `conflict` / `validation` / `business_rule` / `cancelled` / `unavailable` / `error`.
+
+Ідентифікаторів, часових міток і довільного тексту в тегах немає: кожна комбінація тегів — окремий часовий ряд,
+тож кількість рядів обмежена переліками. Межі кошиків гістограм `*.duration` (5 мс … 10 с) задано через
+OpenTelemetry View, щоб розрізняти повтори й таймаути політик.
+
+### 3. Health checks
+
+| Endpoint | Що перевіряє | Для чого |
+|---|---|---|
+| `/health/live` (і `/alive`) | лише процес (`self`, тег `live`) | liveness: збій → перезапуск; < 1 мс, без зовнішніх систем |
+| `/health/ready` | БД, Redis, gRPC-залежності (тег `ready`) | readiness: збій → виключення з балансування |
+| `/health/startup` | запуск завершено (тег `startup`) | startup probe для повільного старту (міграції, сидинг) |
+| `/health` | усі перевірки | `WithHttpHealthCheck` в AppHost → стан ресурсу в Dashboard |
+| `/health/cache` | статистика кешу (Лаб. 06) | діагностика L1/L2 |
+
+Коди відповіді: `Healthy` і `Degraded` → 200, `Unhealthy` → 503. Тіло — JSON зі статусом, описом,
+тривалістю, тегами, помилкою й даними кожної перевірки.
+
+| Сервіс | Перевірка | Статус збою | Таймаут | Теги |
+|---|---|---|---|---|
+| booking-api | `booking-db` (SQL Server, `SELECT 1`) | Unhealthy | 5 с | database, sql, ready |
+| catalog-api | `catalog-db` (SQL Server, `SELECT 1`) | Unhealthy | 5 с | database, sql, ready |
+| reviews-api | `reviews-db` (MongoDB `ping`) | Unhealthy | 5 с | database, mongodb, ready |
+| усі сервіси й Aggregator | `redis-cache` (Redis `PING`) | **Degraded** — кеш необов'язковий | 3 с | cache, redis, ready |
+| aggregator | `catalog-api`, `booking-api` (gRPC `Health/Check`, deadline 2 с) | Unhealthy (критичні) | 3 с | grpc, downstream, ready |
+| aggregator | `reviews-api` (gRPC `Health/Check`, deadline 2 с) | Degraded (некритичний) | 3 с | grpc, downstream, ready |
+
+Мікросервіси відповідають за стандартним **gRPC Health Checking Protocol** (`AddGrpcHealthChecks`,
+`MapGrpcHealthChecksService`). Відповідь будується на тих самих readiness-перевірках: недоступна БД → `NOT_SERVING`,
+недоступний Redis → `SERVING`. Aggregator опитує сервіси власною перевіркою `DownstreamGrpcHealthCheck`.
+Її клієнт без resilience-обробника, тож перевірка не повторюється й не впливає на circuit breaker робочих клієнтів.
+У даних перевірки видно поточний стан circuit breaker сервісу.
+
+### 4. Моніторинг в Aspire Dashboard
+
+- **Resources** — стан кожного ресурсу (Healthy / Degraded / Unhealthy). Клік на ресурс показує деталі
+  health checks. `WaitFor` чекає, поки залежність стане здоровою.
+- **Metrics** — ресурс → Meter:
+  - `Booking.Api`, `Catalog.Api`, `Reviews.Api`, `Aggregator.Api` — бізнес-метрики (фільтри за тегами, напр.
+    `bookings.paid` за `payment.method`, `bookings.operation.duration` за `status`);
+  - `Polly` — `resilience.polly.strategy.events`, фільтр `event.name` = `OnRetry` / `OnCircuitOpened` / `OnTimeout`;
+    `resilience.polly.pipeline.duration` за `pipeline.name`;
+  - `Carpathians.Cache` — `cache.hits`, `cache.misses`, `cache.distributed.available`.
+- **Structured logs** — фільтр за ресурсом і рівнем:
+  - `Carpathians.Aggregator.Resilience` — переходи circuit breaker;
+  - `Polly` — повтори й таймаути;
+  - `CorrelationId` — наскрізний пошук запиту.
+- **Traces** — паралельні gRPC-виклики Aggregator, повтори видно як кілька spans спроб.
+  Службові health-запити не трасуються.
+
+**Критичні сигнали:**
+- зростання `OnRetry` і `aggregator.downstream.failures` для одного сервісу — привід розслідувати сам сервіс;
+- `aggregator.circuit.state = 2` — ланцюг розімкнено;
+- `aggregation.result = partial` — Aggregator працює в деградованому режимі;
+- `cache.distributed.available = 0` — Redis недоступний;
+- p95 `*.operation.duration` — затримка ключових операцій.
+
+### 5. Сценарії перевірки
+
+`/dev/faults` (лише Development) вмикає штучні збої в сервісі без перезапуску. Health endpoints збоям не піддаються.
+
+```powershell
+# 1. Тимчасовий збій reviews-api: зупиніть reviews-api у Dashboard на 5–10 с і запросіть картку
+curl.exe -i http://localhost:5000/api/aggregator/bookings/1/full
+#    -> 200 з warnings ["reviews-api is unavailable"]; Metrics: OnRetry; aggregation.result = partial
+
+# 2. Circuit breaker: усі запити reviews-api відповідають 503
+curl.exe -k -X POST "https://localhost:7203/dev/faults?failureRate=1"
+1..15 | % { curl.exe -s -o NUL -w "%{http_code} %{time_total}s`n" http://localhost:5000/api/aggregator/routes/1/overview }
+#    -> лог Error "Circuit breaker for reviews-api (Grpc) opened"; наступні відповіді миттєві;
+#       aggregator.circuit.state{downstream.service=reviews-api} = 2; через 30 с — HalfOpened -> Closed
+curl.exe -k -X DELETE https://localhost:7203/dev/faults
+
+# 3. Таймаут спроби: затримка 3 с > таймауту спроби 1 с
+curl.exe -k -X POST "https://localhost:7203/dev/faults?failureRate=0&delayMs=3000"
+#    -> OnTimeout у метриках Polly; часткова відповідь у межах загального таймауту reviews-api (3 с), а не 30 с
+
+# 4. Redis: зупиніть redis у Dashboard
+curl.exe -k https://localhost:7047/health/ready   # -> "redis-cache": Degraded, HTTP 200; API відповідає далі
+
+# 5. SQL Server: зупиніть sql у Dashboard
+curl.exe -k https://localhost:7047/health/live    # -> 200 Healthy
+curl.exe -k https://localhost:7047/health/ready   # -> 503, "booking-db": Unhealthy
+
+# 6. Бізнес-метрики: створіть кілька бронювань (Services/Booking/.../Carpathians.Booking.Api.http)
+#    -> Metrics: bookings.created за booking.status, розподіл bookings.operation.duration
+```
+
+Порти сервісів (профіль `https`): booking-api `7047`, catalog-api `7052`, reviews-api `7203`, aggregator `5110`,
+gateway `5000`. Точні адреси показує Dashboard → Resources.
