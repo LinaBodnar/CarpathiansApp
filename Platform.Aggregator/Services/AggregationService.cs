@@ -3,6 +3,7 @@ using Carpathians.Booking.Grpc;
 using Carpathians.Catalog.Grpc;
 using Carpathians.Grpc.Common;
 using Carpathians.Platform.Aggregator.Caching;
+using Carpathians.Platform.Aggregator.Metrics;
 using Carpathians.Platform.Aggregator.Models;
 using Carpathians.Platform.Aggregator.Resilience;
 using Carpathians.Platform.ServiceDefaults.Caching;
@@ -29,6 +30,7 @@ public class AggregationService(
     CatalogGrpc.CatalogGrpcClient catalog,
     ReviewsGrpc.ReviewsGrpcClient reviews,
     AggregatedResponseCache cache,
+    AggregatorMetrics metrics,
     ILogger<AggregationService> logger)
 {
     public const int LatestReviewsCount = 3;
@@ -43,7 +45,11 @@ public class AggregationService(
     // ---------- Повна картка бронювання ----------
 
     /// <summary>Повна картка бронювання. Value = null — бронювання не існує; FromCache — відповідь з Redis.</summary>
-    public async Task<(FullBookingDto? Value, bool FromCache)> GetFullBookingAsync(long bookingId, CancellationToken ct)
+    public Task<(FullBookingDto? Value, bool FromCache)> GetFullBookingAsync(long bookingId, CancellationToken ct)
+        => metrics.MeasureAsync(AggregatorMetrics.Aggregations.FullBooking,
+            () => GetFullBookingCoreAsync(bookingId, ct), result => !result.IsComplete);
+
+    private async Task<(FullBookingDto? Value, bool FromCache)> GetFullBookingCoreAsync(long bookingId, CancellationToken ct)
     {
         var key = AggregatorCacheKeys.FullBooking(bookingId);
         if (await cache.GetAsync<FullBookingDto>(key, ct) is { } cached)
@@ -77,6 +83,7 @@ public class AggregationService(
         }
         catch (RpcException ex) when (!ct.IsCancellationRequested)
         {
+            metrics.DownstreamFailed(BookingService, ex.StatusCode);
             logger.LogError(ex, "{Service} is unavailable ({GrpcStatus}), booking {BookingId} cannot be aggregated",
                 BookingService, ex.StatusCode, bookingId);
             throw new UpstreamUnavailableException(BookingService, ex);
@@ -171,7 +178,11 @@ public class AggregationService(
     // ---------- Огляд маршруту ----------
 
     /// <summary>Огляд маршруту. Value = null — маршруту немає ніде; FromCache — відповідь з Redis.</summary>
-    public async Task<(RouteOverviewDto? Value, bool FromCache)> GetRouteOverviewAsync(long routeId, CancellationToken ct)
+    public Task<(RouteOverviewDto? Value, bool FromCache)> GetRouteOverviewAsync(long routeId, CancellationToken ct)
+        => metrics.MeasureAsync(AggregatorMetrics.Aggregations.RouteOverview,
+            () => GetRouteOverviewCoreAsync(routeId, ct), result => !result.IsComplete);
+
+    private async Task<(RouteOverviewDto? Value, bool FromCache)> GetRouteOverviewCoreAsync(long routeId, CancellationToken ct)
     {
         var key = AggregatorCacheKeys.RouteOverview(routeId);
         if (await cache.GetAsync<RouteOverviewDto>(key, ct) is { } cached)
@@ -252,6 +263,7 @@ public class AggregationService(
         }
         catch (RpcException ex) when (!ct.IsCancellationRequested)
         {
+            metrics.DownstreamFailed(service, ex.StatusCode);
             logger.LogWarning(ex, "{Service} is unavailable for {Resource} after {ElapsedMs} ms: {GrpcStatus} {GrpcDetail}",
                 service, resource, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds, ex.StatusCode, ex.Status.Detail);
             warnings.Add($"{service} is unavailable");

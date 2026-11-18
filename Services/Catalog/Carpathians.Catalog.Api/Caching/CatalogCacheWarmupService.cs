@@ -42,7 +42,8 @@ public sealed class CatalogCacheWarmupService(
         {
             await using var scope = scopeFactory.CreateAsyncScope();
             var regions = scope.ServiceProvider.GetRequiredService<IRegionService>();
-            var routes = scope.ServiceProvider.GetRequiredService<IRouteService>();      // декоратор з кешем
+            // декоратор з кешем без бізнес-метрик: прогрівання — не пошук користувача, лічильники не спотворюються
+            var routes = scope.ServiceProvider.GetRequiredService<CachedRouteService>();
 
             var regionList = await regions.GetAllAsync(ct);
             var popular = await routes.GetPopularChallengingAsync(ct);

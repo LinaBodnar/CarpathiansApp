@@ -95,4 +95,24 @@ public sealed class BookingRepository : BaseDapperRepository<Booking>, IBookingR
             new { BookingId = bookingId, ChangedBy = changedBy },
             CommandType.StoredProcedure, ct)));
     }
+
+    public async Task<BookingStatistics> GetStatisticsAsync(CancellationToken ct = default)
+    {
+        // Легкі агрегати за індексованими полями: виконуються фоново раз на кілька десятків секунд, не на кожен запит.
+        const string sql = @"
+            SELECT Status, COUNT(*) AS Count
+            FROM dbo.Bookings
+            WHERE IsDeleted = 0
+            GROUP BY Status;
+
+            SELECT ISNULL(SUM(SeatsAvailable), 0)
+            FROM dbo.Departures
+            WHERE IsDeleted = 0 AND DepartureDate >= CAST(SYSUTCDATETIME() AS DATE);";
+        await EnsureOpenAsync(ct);
+        using var grid = await Connection.QueryMultipleAsync(Cmd(sql, ct: ct));
+        var byStatus = (await grid.ReadAsync<(string Status, int Count)>())
+            .ToDictionary(r => r.Status, r => r.Count, StringComparer.Ordinal);
+        var seats = await grid.ReadSingleAsync<int>();
+        return new BookingStatistics(byStatus, seats);
+    }
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Carpathians.Platform.ServiceDefaults.Caching;
 using Carpathians.Platform.ServiceDefaults.Correlation;
+using Carpathians.Platform.ServiceDefaults.Metrics;
 using Carpathians.Platform.ServiceDefaults.Resilience;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -133,7 +134,12 @@ public static class Extensions
                 .AddRuntimeInstrumentation()
                 .AddMeter(CacheMetrics.MeterName)                     // кеш: cache.hits, cache.misses, ... (Лаб. 06)
                 .AddMeter(ResilienceMeter)                            // Polly: OnRetry, OnCircuitOpened, ... (Лаб. 07)
-                .AddMeter("Carpathians.*"))                         // інші власні метрики (Gateway)
+                .AddMeter(BusinessMeters.All)                         // бізнес-метрики: Booking.Api, Catalog.Api, Reviews.Api, Aggregator.Api (Лаб. 07)
+                .AddMeter("Carpathians.*")                          // інші власні метрики (Gateway)
+                // межі кошиків гістограм тривалості бізнес-операцій (*.duration) — до 10 с, щоб бачити повтори й таймаути
+                .AddView(instrument => OperationDurationBuckets.Applies(instrument.Meter.Name, instrument.Name)
+                    ? new ExplicitBucketHistogramConfiguration { Boundaries = OperationDurationBuckets.Boundaries }
+                    : null))
             .WithTracing(tracing => tracing
                 .SetSampler(CreateSampler(builder))
                 .AddSource(builder.Environment.ApplicationName)       // власні spans сервісу (Activity API)

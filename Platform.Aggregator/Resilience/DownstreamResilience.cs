@@ -1,3 +1,4 @@
+using Carpathians.Platform.Aggregator.Metrics;
 using Grpc.Core;
 using Grpc.Net.Client.Configuration;
 using Microsoft.Extensions.Http.Resilience;
@@ -42,6 +43,7 @@ public static class DownstreamResilience
         builder.AddStandardResilienceHandler().Configure((options, services) =>
         {
             var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory);
+            var circuits = services.GetService<CircuitBreakerStates>();   // gauge aggregator.circuit.state (Лаб. 07)
             var client = $"{policy.Service} ({transport})";
 
             // Retry: експоненційна затримка з jitter — клієнти не повторюють запити одночасно (thundering herd).
@@ -63,17 +65,20 @@ public static class DownstreamResilience
             options.CircuitBreaker.BreakDuration = policy.BreakDuration;
             options.CircuitBreaker.OnOpened = args =>
             {
+                circuits?.Set(policy.Service, transport, DownstreamCircuitState.Open);
                 logger.LogError("Circuit breaker for {Client} opened for {BreakSeconds} s after {Outcome}; calls are rejected without waiting",
                     client, args.BreakDuration.TotalSeconds, Describe(args.Outcome));
                 return ValueTask.CompletedTask;
             };
             options.CircuitBreaker.OnHalfOpened = _ =>
             {
+                circuits?.Set(policy.Service, transport, DownstreamCircuitState.HalfOpen);
                 logger.LogWarning("Circuit breaker for {Client} is half-open: probing with a trial request", client);
                 return ValueTask.CompletedTask;
             };
             options.CircuitBreaker.OnClosed = _ =>
             {
+                circuits?.Set(policy.Service, transport, DownstreamCircuitState.Closed);
                 logger.LogInformation("Circuit breaker for {Client} closed: {Service} is responding again", client, policy.Service);
                 return ValueTask.CompletedTask;
             };

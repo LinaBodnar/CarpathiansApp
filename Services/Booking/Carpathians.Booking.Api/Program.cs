@@ -1,5 +1,6 @@
 using Carpathians.Api.Caching;
 using Carpathians.Api.Grpc;
+using Carpathians.Api.Metrics;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
@@ -42,7 +43,15 @@ builder.Services.AddScoped<DepartureService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<ICustomerService, CachedCustomerService>();
 builder.Services.AddScoped<IDepartureService, CachedDepartureService>();
-builder.Services.AddScoped<IBookingService, CachedBookingService>();
+builder.Services.AddScoped<CachedBookingService>();
+
+// Бізнес-метрики (Лаб. 07): Meter "Booking.Api" (Singleton на весь час роботи), декоратор операцій бронювання
+// поверх кешу (лічильники подій + тривалість), знімок стану для gauge, що оновлюється фоново.
+builder.Services.AddSingleton<BookingStatisticsSnapshot>();
+builder.Services.AddSingleton<BookingMetrics>();
+builder.Services.AddHostedService<BookingStatisticsRefresher>();
+builder.Services.AddScoped<IBookingService>(sp => new MeteredBookingService(
+    sp.GetRequiredService<CachedBookingService>(), sp.GetRequiredService<BookingMetrics>()));
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"];

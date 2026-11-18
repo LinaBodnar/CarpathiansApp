@@ -1,6 +1,7 @@
 using Carpathians.Api.Filters;
 using Carpathians.Catalog.Api.Caching;
 using Carpathians.Catalog.Api.Grpc;
+using Carpathians.Catalog.Api.Metrics;
 using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
@@ -74,9 +75,19 @@ builder.Services.AddHostedService<CatalogCacheWarmupService>();
 builder.Services.AddScoped<RouteService>();
 builder.Services.AddScoped<PointService>();
 builder.Services.AddScoped<RegionService>();
-builder.Services.AddScoped<IRouteService, CachedRouteService>();
-builder.Services.AddScoped<IPointService, CachedPointService>();
+builder.Services.AddScoped<CachedRouteService>();
+builder.Services.AddScoped<CachedPointService>();
 builder.Services.AddScoped<IRegionService, CachedRegionService>();
+
+// Бізнес-метрики (Лаб. 07): Meter "Catalog.Api" (Singleton), декоратори маршрутів і точок поверх кешу
+// (лічильники + тривалість операцій), знімок стану каталогу для gauge, що оновлюється фоново.
+builder.Services.AddSingleton<CatalogStatisticsSnapshot>();
+builder.Services.AddSingleton<CatalogMetrics>();
+builder.Services.AddHostedService<CatalogStatisticsRefresher>();
+builder.Services.AddScoped<IRouteService>(sp => new MeteredRouteService(
+    sp.GetRequiredService<CachedRouteService>(), sp.GetRequiredService<CatalogMetrics>()));
+builder.Services.AddScoped<IPointService>(sp => new MeteredPointService(
+    sp.GetRequiredService<CachedPointService>(), sp.GetRequiredService<CatalogMetrics>()));
 
 // ProblemDetails & Exception Handler
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>

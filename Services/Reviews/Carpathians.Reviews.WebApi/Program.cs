@@ -10,6 +10,7 @@ using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Reviews.WebApi.Caching;
 using Carpathians.Reviews.WebApi.Grpc;
 using Carpathians.Reviews.WebApi.Mappings;
+using Carpathians.Reviews.WebApi.Metrics;
 using Carpathians.Reviews.WebApi.Middleware;
 using MongoDB.Driver;
 using Serilog;
@@ -31,9 +32,17 @@ if (builder.Configuration.GetConnectionString("ReviewsDb") is { Length: > 0 } as
 
 // Шари Clean Architecture: кожен шар надає власний метод розширення
 // (+ збірка WebApi з ApiMappingProfile: контракти API -> команди)
+// MetricsBehavior (Лаб. 07) — найзовнішній behavior MediatR: тривалість і бізнес-лічильники кожної команди/запиту.
 builder.Services
-    .AddApplication(builder.Configuration, typeof(ApiMappingProfile).Assembly)  // MediatR, Behaviors, валідатори, AutoMapper
+    .AddApplication(builder.Configuration,                                      // MediatR, Behaviors, валідатори, AutoMapper
+        cfg => cfg.AddOpenBehavior(typeof(MetricsBehavior<,>)),
+        typeof(ApiMappingProfile).Assembly)
     .AddInfrastructure(builder.Configuration);                                  // MongoDB: мапінг, контекст, репозиторії, запити
+
+// Бізнес-метрики (Лаб. 07): Meter "Reviews.Api" (Singleton), знімок стану MongoDB для gauge, що оновлюється фоново.
+builder.Services.AddSingleton<ReviewsStatisticsSnapshot>();
+builder.Services.AddSingleton<ReviewsMetrics>();
+builder.Services.AddHostedService<ReviewsStatisticsRefresher>();
 
 // Кеш (Лаб. 06)
 // L2: IDistributedCache поверх Redis (ConnectionStrings:redis від AppHost, Aspire-інтеграція).

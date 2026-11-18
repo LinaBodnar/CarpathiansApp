@@ -6,6 +6,7 @@ using Carpathians.Catalog.Grpc;
 using Carpathians.Platform.Aggregator.Caching;
 using Carpathians.Platform.Aggregator.Clients;
 using Carpathians.Platform.Aggregator.Grpc;
+using Carpathians.Platform.Aggregator.Metrics;
 using Carpathians.Platform.Aggregator.Resilience;
 using Carpathians.Platform.Aggregator.Services;
 using Carpathians.Platform.ServiceDefaults.Caching;
@@ -73,6 +74,10 @@ builder.Services.AddSingleton(sp => new AggregatedResponseCache(
     sp.GetRequiredService<CacheMetrics>(),
     sp.GetRequiredService<ILogger<AggregatedResponseCache>>(),
     sp.GetService<IDistributedCache>()));
+
+// Бізнес-метрики (Лаб. 07): Meter "Aggregator.Api" — результати агрегації, збої мікросервісів, стан circuit breaker
+builder.Services.AddSingleton<CircuitBreakerStates>();
+builder.Services.AddSingleton<AggregatorMetrics>();
 
 builder.Services.AddScoped<AggregationService>();          // gRPC — основна агрегація
 builder.Services.AddScoped<HttpAggregationService>();      // HTTP (Лаб. 05) — для порівняння
