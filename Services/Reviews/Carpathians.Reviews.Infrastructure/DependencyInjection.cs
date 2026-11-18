@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IReviewQueries, ReviewQueries>();
         services.AddScoped<IDiscussionQueries, DiscussionQueries>();
         services.AddScoped<IRatingService, RatingService>();
+        services.AddScoped<IIntegrationEventStore, IntegrationEventStore>();   // ідемпотентність обробників подій (Лаб. 08)
 
         // Ідемпотентний сідінг (по одному сідеру на колекцію)
         services.AddSingleton<IDataSeeder, DiscussionSeeder>();

@@ -11,6 +11,8 @@ using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Reviews.WebApi.Caching;
 using Carpathians.Reviews.WebApi.Grpc;
 using Carpathians.Reviews.WebApi.HealthChecks;
+using Carpathians.Reviews.WebApi.IntegrationEvents.Events;
+using Carpathians.Reviews.WebApi.IntegrationEvents.Handlers;
 using Carpathians.Reviews.WebApi.Mappings;
 using Carpathians.Reviews.WebApi.Metrics;
 using Carpathians.Reviews.WebApi.Middleware;
@@ -85,8 +87,11 @@ builder.AddReviewsHealthChecks();
 
 // Брокер повідомлень (Лаб. 08): IConnection і health check через Aspire.RabbitMQ.Client (ConnectionStrings:messaging).
 // Відгуки — споживач подій Каталогу: черга reviews.catalog-sync (route.renamed) з чергою повторів і DLQ.
+// Обробник оновлює routeName в усіх відгуках і обговореннях маршруту (SyncRouteNameCommand),
+// ідемпотентно — через колекцію processedEvents.
 builder.AddEventBus()
-    .DeclareConsumerQueue(CatalogTopology.ReviewsCatalogSync);
+    .AddConsumer(CatalogTopology.ReviewsCatalogSync, handlers => handlers
+        .On<RouteRenamedIntegrationEvent, RouteRenamedHandler>());
 
 // gRPC-сервер (Лаб. 06): HTTP/2 через HTTPS-endpoint (Http1AndHttp2, ALPN), interceptor-и:
 // логування/трасування викликів і перетворення доменних винятків на коди статусу gRPC.

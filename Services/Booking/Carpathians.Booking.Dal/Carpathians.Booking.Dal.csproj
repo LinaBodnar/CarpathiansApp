@@ -15,4 +15,9 @@
       <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     </ItemGroup>
 
+    <!-- Лаб. 08: SQL-міграції (ProcessedEvents, RouteRefs), застосовує BookingSchemaMigrator під час старту -->
+    <ItemGroup>
+      <EmbeddedResource Include="Migrations\*.sql" />
+    </ItemGroup>
+
 </Project>

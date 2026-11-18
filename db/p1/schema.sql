@@ -35,7 +35,22 @@ BEGIN
         Id        BIGINT        NOT NULL,   
         Name      NVARCHAR(200) NOT NULL,
         UpdatedAt DATETIME2     NOT NULL CONSTRAINT DF_RouteRefs_UpdatedAt DEFAULT SYSUTCDATETIME(),
+        -- Лаб. 08: час останньої застосованої події Каталогу (захист від out-of-order) і ознака видалення
+        CatalogChangedAt DATETIME2 NULL,
+        IsActive  BIT           NOT NULL CONSTRAINT DF_RouteRefs_IsActive DEFAULT 1,
         CONSTRAINT PK_RouteRefs PRIMARY KEY (Id)
+    );
+END
+GO
+
+-- Лаб. 08: оброблені integration events (ідемпотентність споживача подій Каталогу)
+IF OBJECT_ID(N'dbo.ProcessedEvents', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProcessedEvents (
+        EventId     UNIQUEIDENTIFIER NOT NULL,
+        EventType   NVARCHAR(200)    NOT NULL,
+        ProcessedAt DATETIME2        NOT NULL CONSTRAINT DF_ProcessedEvents_ProcessedAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_ProcessedEvents PRIMARY KEY (EventId)
     );
 END
 GO

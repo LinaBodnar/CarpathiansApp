@@ -16,11 +16,15 @@ public sealed class UnitOfWork : IUnitOfWork
         Customers  = new CustomerRepository(_connection, () => _transaction);
         Departures = new DepartureRepository(_connection, () => _transaction);
         Bookings   = new BookingRepository(_connection, () => _transaction);
+        RouteRefs  = new RouteRefRepository(_connection, () => _transaction);
+        ProcessedEvents = new ProcessedEventRepository(_connection, () => _transaction);
     }
 
     public ICustomerRepository Customers { get; }
     public IDepartureRepository Departures { get; }
     public IBookingRepository Bookings { get; }
+    public IRouteRefRepository RouteRefs { get; }
+    public IProcessedEventRepository ProcessedEvents { get; }
 
     public async Task BeginTransactionAsync(IsolationLevel level = IsolationLevel.ReadCommitted,
                                             CancellationToken ct = default)

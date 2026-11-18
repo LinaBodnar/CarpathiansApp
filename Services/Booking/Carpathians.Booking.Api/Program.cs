@@ -1,12 +1,16 @@
 using Carpathians.Api.Caching;
 using Carpathians.Api.Grpc;
 using Carpathians.Api.HealthChecks;
+using Carpathians.Api.IntegrationEvents;
+using Carpathians.Api.IntegrationEvents.Events;
+using Carpathians.Api.IntegrationEvents.Handlers;
 using Carpathians.Api.Metrics;
 using Carpathians.Api.Middleware;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Bll.Mapping;
 using Carpathians.Bll.Services;
 using Carpathians.Dal.Interfaces;
+using Carpathians.Dal.Migrations;
 using Carpathians.Dal.Repositories;
 using Carpathians.Platform.EventBus;
 using Carpathians.Platform.EventBus.Topology;
@@ -43,8 +47,14 @@ builder.AddBookingHealthChecks(connectionString);
 
 // Брокер повідомлень (Лаб. 08): IConnection і health check через Aspire.RabbitMQ.Client (ConnectionStrings:messaging).
 // Бронювання — споживач подій Каталогу: черга booking.catalog-sync (route.*) з чергою повторів і DLQ.
+// Обробники оновлюють копію довідника маршрутів dbo.RouteRefs (політика дублювання з Лаб. 01),
+// ідемпотентно — через dbo.ProcessedEvents у тій самій транзакції.
+builder.Services.AddScoped<RouteRefsSynchronizer>();
 builder.AddEventBus()
-    .DeclareConsumerQueue(CatalogTopology.BookingCatalogSync);
+    .AddConsumer(CatalogTopology.BookingCatalogSync, handlers => handlers
+        .On<RouteCreatedIntegrationEvent, RouteCreatedHandler>()
+        .On<RouteRenamedIntegrationEvent, RouteRenamedHandler>()
+        .On<RouteDeletedIntegrationEvent, RouteDeletedHandler>());
 
 // L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
 builder.AddPlatformCaching();
@@ -88,6 +98,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// SQL-міграції Лаб. 08 (ProcessedEvents, RouteRefs.CatalogChangedAt/IsActive) — ідемпотентні, поза Production
+if (!app.Environment.IsProduction())
+{
+    var applied = await BookingSchemaMigrator.ApplyAsync(connectionString);
+    app.Logger.LogInformation("Booking schema migrations applied: {Migrations}", applied);
+}
 
 app.UseCorrelationId();
 app.UseSerilogRequestLogging();

@@ -1,3 +1,5 @@
+using Carpathians.Platform.EventBus.Consuming;
+using Carpathians.Platform.EventBus.Diagnostics;
 using Carpathians.Platform.EventBus.Messaging;
 using Carpathians.Platform.EventBus.Publishing;
 using Carpathians.Platform.EventBus.Topology;
@@ -56,6 +58,7 @@ public static class EventBusExtensions
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSingleton<CorrelationContext>();
         builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
+        builder.Services.AddSingleton<MessagingMetrics>();
 
         return new EventBusBuilder(builder);
     }
@@ -79,6 +82,27 @@ public sealed class EventBusBuilder(IHostApplicationBuilder builder)
     public EventBusBuilder DeclareConsumerQueue(ConsumerQueue queue)
     {
         Services.Configure<TopologyOptions>(o => o.ConsumerQueues.Add(queue));
+        return this;
+    }
+
+    /// <summary>
+    /// Споживач черги (hosted service <see cref="RabbitMqEventConsumer"/>) з обробниками за типами подій:
+    /// <code>
+    /// .AddConsumer(CatalogTopology.BookingCatalogSync, handlers => handlers
+    ///     .On&lt;RouteRenamedIntegrationEvent, RouteRenamedHandler&gt;())
+    /// </code>
+    /// Обробники реєструються як scoped — створюються в DI-scope кожного повідомлення.
+    /// </summary>
+    public EventBusBuilder AddConsumer(ConsumerQueue queue, Action<EventHandlerRegistry> configure)
+    {
+        var registry = new EventHandlerRegistry();
+        configure(registry);
+
+        foreach (var handlerType in registry.HandlerTypes)
+            Services.AddScoped(handlerType);
+
+        DeclareConsumerQueue(queue);
+        Services.AddSingleton<IHostedService>(sp => ActivatorUtilities.CreateInstance<RabbitMqEventConsumer>(sp, queue, registry));
         return this;
     }
 }

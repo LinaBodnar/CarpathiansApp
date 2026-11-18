@@ -139,6 +139,7 @@ public static class Extensions
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddMeter(CacheMetrics.MeterName)                     // кеш: cache.hits, cache.misses, ... (Лаб. 06)
+                .AddMeter(MessagingActivitySource)                    // RabbitMQ: оброблені повідомлення, глибина черг і DLQ (Лаб. 08)
                 .AddMeter(ResilienceMeter)                            // Polly: OnRetry, OnCircuitOpened, ... (Лаб. 07)
                 .AddMeter(BusinessMeters.All)                         // бізнес-метрики: Booking.Api, Catalog.Api, Reviews.Api, Aggregator.Api (Лаб. 07)
                 .AddMeter("Carpathians.*")                          // інші власні метрики (Gateway)

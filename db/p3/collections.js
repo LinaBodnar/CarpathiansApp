@@ -127,4 +127,11 @@ db.discussionMessages.createIndex({ discussionId: 1, createdAt: 1 }, { name: 'ix
 
 db.ratings.createIndex({ routeId: 1 }, { name: 'ux_ratings_route', unique: true });
 
+// Лаб. 08: обробка подій Каталогу (RabbitMQ)
+// processedEvents — { _id: EventId, eventType, processedAt }: унікальний _id = ідемпотентність споживача
+// routeNameSync   — { _id: routeId, routeName, changedAt }: час останньої застосованої події (out-of-order)
+if (!db.getCollectionNames().includes('processedEvents')) db.createCollection('processedEvents');
+if (!db.getCollectionNames().includes('routeNameSync')) db.createCollection('routeNameSync');
+db.processedEvents.createIndex({ processedAt: 1 }, { name: 'ix_processed_events_processed_at' });
+
 print('ReviewContext initialised');
