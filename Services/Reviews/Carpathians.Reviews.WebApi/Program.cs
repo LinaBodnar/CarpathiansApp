@@ -1,3 +1,4 @@
+using Carpathians.Platform.ServiceDefaults.Security;
 using System.Reflection;
 using Carpathians.Reviews.Application;
 using Carpathians.Reviews.Application.Common.Interfaces;
@@ -24,6 +25,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Спільні налаштування платформи: Serilog, OpenTelemetry, health checks, service discovery
 builder.AddServiceDefaults();
+
+// Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
+builder.AddPlatformAuthentication();
 
 // Aspire передає рядок підключення як ConnectionStrings:ReviewsDb (з іменем бази в URL);
 // без Aspire використовується секція MongoDb з appsettings.json.
@@ -125,6 +129,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UsePlatformAuthentication();
 app.MapControllers();
 app.MapGrpcService<ReviewsGrpcService>();          // gRPC: carpathians.reviews.v1.ReviewsGrpc
 app.MapGrpcHealthChecksService();                  // gRPC: grpc.health.v1.Health (Check/Watch) — для Aggregator

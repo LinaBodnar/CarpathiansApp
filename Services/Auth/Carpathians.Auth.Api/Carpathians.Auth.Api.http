@@ -1,0 +1,71 @@
+### Auth Service через Gateway (Лаб. 09). Порядок: register -> лист -> verify-email -> login -> ...
+@gateway = http://localhost:5000
+
+### 1. Реєстрація (роль User, лист підтвердження)
+POST {{gateway}}/auth/register
+Content-Type: application/json
+
+{ "userName": "olena", "email": "olena@example.com", "password": "Hiking2025", "displayName": "Olena" }
+
+### 2. Лист mock email service (Development): userId і token для підтвердження
+GET {{gateway}}/auth/dev/emails?to=olena@example.com
+
+### 3. Вхід до підтвердження email -> 403
+POST {{gateway}}/auth/login
+Content-Type: application/json
+
+{ "login": "olena", "password": "Hiking2025" }
+
+### 4. Підтвердження email (значення з листа)
+POST {{gateway}}/auth/verify-email
+Content-Type: application/json
+
+{ "userId": "<userId>", "token": "<token>" }
+
+### 5. Вхід -> accessToken у тілі, refreshToken у cookie (HttpOnly, шлях /auth)
+# @name login
+POST {{gateway}}/auth/login
+Content-Type: application/json
+
+{ "login": "olena", "password": "Hiking2025" }
+
+### 6. Новий access token за refresh token з cookie (ротація: старий відкликається)
+POST {{gateway}}/auth/refresh-token
+
+### 7. Захищений endpoint
+GET {{gateway}}/users/{{login.response.body.$.user.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 8. Admin-endpoint для User -> 403
+GET {{gateway}}/users
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 9. Без токена -> 401 (перевіряє Gateway)
+GET {{gateway}}/api/bookings/1
+
+### 10. Історія refresh tokens
+GET {{gateway}}/users/{{login.response.body.$.user.id}}/refresh-tokens
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 11. Зміна пароля
+POST {{gateway}}/auth/change-password
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "currentPassword": "Hiking2025", "newPassword": "Hiking2026" }
+
+### 12. Скидання пароля: запит листа, потім reset за токеном
+POST {{gateway}}/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "olena@example.com" }
+
+###
+POST {{gateway}}/auth/reset-password
+Content-Type: application/json
+
+{ "email": "olena@example.com", "token": "<token>", "newPassword": "Hiking2027" }
+
+### 13. Вихід (відкликає refresh token cookie)
+POST {{gateway}}/auth/logout
+Authorization: Bearer {{login.response.body.$.accessToken}}

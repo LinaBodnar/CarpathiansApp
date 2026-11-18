@@ -29,6 +29,8 @@
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <!-- gRPC: спільні серверні interceptor-и (логування, трасування, перетворення винятків) -->
     <PackageReference Include="Grpc.Core.Api" Version="2.76.0" />
+    <!-- Лаб. 09: перевірка JWT (Auth Service, IdentityServer, Keycloak) у Gateway і мікросервісах -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
   </ItemGroup>
 
 </Project>

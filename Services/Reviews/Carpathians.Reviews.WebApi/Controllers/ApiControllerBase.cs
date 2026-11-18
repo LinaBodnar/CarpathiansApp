@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Carpathians.Reviews.WebApi.Controllers;
@@ -8,6 +9,7 @@ namespace Carpathians.Reviews.WebApi.Controllers;
 /// HTTP-запит на команду або запит і передають його в MediatR — без бізнес-логіки й без доступу до БД.
 /// </summary>
 [ApiController]
+[Authorize]   // Лаб. 09: усі контролери Відгуків — лише з дійсним JWT
 [Produces("application/json")]
 public abstract class ApiControllerBase : ControllerBase
 {

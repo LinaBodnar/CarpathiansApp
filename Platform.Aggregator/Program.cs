@@ -1,3 +1,4 @@
+using Carpathians.Platform.ServiceDefaults.Security;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
@@ -19,6 +20,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Serilog, OpenTelemetry, health checks, service discovery; CorrelationIdHandler і resilience
 // підключено до всіх HttpClient у ServiceDefaults — і до gRPC-клієнтів, що працюють поверх HttpClientFactory.
 builder.AddServiceDefaults();
+
+// Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
+builder.AddPlatformAuthentication();
 
 // ---------- gRPC-клієнти мікросервісів (Лаб. 06) ----------
 // Адреса — логічне ім'я ресурсу AppHost: service discovery працює так само, як для HttpClient у Лаб. 05.
@@ -50,10 +54,13 @@ builder.Services.AddGrpcClient<ReviewsGrpc.ReviewsGrpcClient>(o => o.Address = n
 // Typed HttpClients Лаб. 05 — для порівняння затримок HTTP і gRPC (HttpAggregationService); ті самі політики,
 // повтори лише для безпечних методів.
 builder.Services.AddHttpClient<BookingClient>(c => c.BaseAddress = new Uri("https+http://booking-api"))
+    .AddHttpMessageHandler<ForwardAuthorizationHandler>()     // access token користувача -> мікросервіс (Лаб. 09)
     .AddDownstreamResilience(DownstreamPolicies.Booking, DownstreamTransport.Http);
 builder.Services.AddHttpClient<CatalogClient>(c => c.BaseAddress = new Uri("https+http://catalog-api"))
+    .AddHttpMessageHandler<ForwardAuthorizationHandler>()
     .AddDownstreamResilience(DownstreamPolicies.Catalog, DownstreamTransport.Http);
 builder.Services.AddHttpClient<ReviewsClient>(c => c.BaseAddress = new Uri("https+http://reviews-api"))
+    .AddHttpMessageHandler<ForwardAuthorizationHandler>()
     .AddDownstreamResilience(DownstreamPolicies.Reviews, DownstreamTransport.Http);
 
 // ---------- Кеш агрегованих відповідей у Redis (Лаб. 06) ----------
@@ -109,6 +116,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UsePlatformAuthentication();
 app.MapControllers();
 app.MapDefaultEndpoints();
 

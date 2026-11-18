@@ -1,12 +1,14 @@
 using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Carpathians.Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/points")]
+[Authorize]   // Лаб. 09: лише з дійсним JWT; 401 без токена
 [Produces("application/json")]
 public class PointsController(IPointService points) : ControllerBase
 {

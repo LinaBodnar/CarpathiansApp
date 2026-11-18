@@ -1,11 +1,13 @@
 using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Carpathians.Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/routes")]
+[Authorize]   // Лаб. 09: лише з дійсним JWT; 401 без токена
 [Produces("application/json")]
 public class RoutesController(IRouteService routes, ILogger<RoutesController> logger) : ControllerBase
 {

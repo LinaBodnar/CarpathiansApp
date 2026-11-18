@@ -1,3 +1,4 @@
+using Carpathians.Platform.ServiceDefaults.Security;
 using Carpathians.Api.Filters;
 using Carpathians.Catalog.Api.Caching;
 using Carpathians.Catalog.Api.Grpc;
@@ -24,6 +25,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Спільні налаштування платформи: Serilog, OpenTelemetry, health checks, service discovery
 builder.AddServiceDefaults();
+
+// Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
+builder.AddPlatformAuthentication();
 
 var connectionString = builder.Configuration.GetConnectionString("CatalogDb")
                        ?? throw new InvalidOperationException("Connection string 'CatalogDb' is missing");
@@ -171,6 +175,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UsePlatformAuthentication();
 app.MapControllers();
 app.MapGrpcService<CatalogGrpcService>();          // gRPC: carpathians.catalog.v1.CatalogGrpc
 app.MapGrpcHealthChecksService();                  // gRPC: grpc.health.v1.Health (Check/Watch) — для Aggregator

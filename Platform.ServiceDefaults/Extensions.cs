@@ -3,6 +3,7 @@ using Carpathians.Platform.ServiceDefaults.Correlation;
 using Carpathians.Platform.ServiceDefaults.Health;
 using Carpathians.Platform.ServiceDefaults.Metrics;
 using Carpathians.Platform.ServiceDefaults.Resilience;
+using Carpathians.Platform.ServiceDefaults.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
@@ -61,6 +62,7 @@ public static class Extensions
         builder.Services.AddServiceDiscovery();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddTransient<CorrelationIdHandler>();
+        builder.Services.AddTransient<ForwardAuthorizationHandler>();   // access token користувача у вихідні HTTP-виклики (Лаб. 09)
 
         builder.Services.AddSingleton<FaultInjectionState>();     // імітація збоїв (лише Development)
 

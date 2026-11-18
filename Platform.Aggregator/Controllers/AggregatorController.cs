@@ -1,5 +1,6 @@
 using Carpathians.Platform.Aggregator.Models;
 using Carpathians.Platform.Aggregator.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Carpathians.Platform.Aggregator.Controllers;
@@ -11,6 +12,7 @@ namespace Carpathians.Platform.Aggregator.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/aggregator")]
+[Authorize]   // Лаб. 09: лише з дійсним JWT; 401 без токена
 [Produces("application/json")]
 public class AggregatorController(AggregationService aggregation, TransportBenchmarkService benchmark) : ControllerBase
 {

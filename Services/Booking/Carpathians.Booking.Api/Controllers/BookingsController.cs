@@ -2,12 +2,14 @@
 using Carpathians.Bll.Dtos;
 using Carpathians.Bll.Interfaces;
 using Carpathians.Domain.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Carpathians.Api.Controllers;
 
 [ApiController]
 [Route("api/bookings")]
+[Authorize]   // Лаб. 09: лише з дійсним JWT; 401 без токена
 [Produces("application/json")]
 public class BookingsController(IBookingService bookings, ILogger<BookingsController> logger) : ControllerBase
 {

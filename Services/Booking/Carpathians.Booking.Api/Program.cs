@@ -1,3 +1,4 @@
+using Carpathians.Platform.ServiceDefaults.Security;
 using Carpathians.Api.Caching;
 using Carpathians.Api.Grpc;
 using Carpathians.Api.HealthChecks;
@@ -21,6 +22,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Спільні налаштування платформи: Serilog, OpenTelemetry, health checks, service discovery
 builder.AddServiceDefaults();
+
+// Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
+builder.AddPlatformAuthentication();
 
 var connectionString = builder.Configuration.GetConnectionString("BookingDb")
                        ?? throw new InvalidOperationException("Connection string 'BookingDb' is missing");
@@ -117,6 +121,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UsePlatformAuthentication();
 app.MapControllers();
 app.MapGrpcService<BookingGrpcService>();          // gRPC: carpathians.booking.v1.BookingGrpc
 app.MapGrpcHealthChecksService();                  // gRPC: grpc.health.v1.Health (Check/Watch) — для Aggregator
