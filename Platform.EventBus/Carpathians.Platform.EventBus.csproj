@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Carpathians.Platform.EventBus</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!-- HealthTags, CorrelationId — спільні константи платформи -->
+  <ItemGroup>
+    <ProjectReference Include="..\Platform.ServiceDefaults\Carpathians.Platform.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Aspire-інтеграція для RabbitMQ.Client 7.x: IConnection (singleton) з рядка підключення
+         ConnectionStrings:messaging, повторні спроби підключення, health check.
+         Лінійка 9.5.x — як і решта клієнтських Aspire-пакетів платформи (Redis), сумісна з net8.0. -->
+    <PackageReference Include="Aspire.RabbitMQ.Client.v7" Version="9.5.2" />
+    <!-- офіційний клієнт, версія 7.x: асинхронний API (IChannel, BasicPublishAsync, BasicConsumeAsync) -->
+    <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
+    <!-- W3C traceparent: Propagators.DefaultTextMapPropagator -->
+    <PackageReference Include="OpenTelemetry.Api" Version="1.12.0" />
+  </ItemGroup>
+
+</Project>

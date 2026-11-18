@@ -5,6 +5,8 @@ using Carpathians.Reviews.Domain.Interfaces;
 using Carpathians.Reviews.Infrastructure;
 using Carpathians.Reviews.Infrastructure.Persistence.Queries;
 using Carpathians.Reviews.Infrastructure.Persistence.Repositories;
+using Carpathians.Platform.EventBus;
+using Carpathians.Platform.EventBus.Topology;
 using Carpathians.Platform.ServiceDefaults.Grpc;
 using Carpathians.Reviews.WebApi.Caching;
 using Carpathians.Reviews.WebApi.Grpc;
@@ -80,6 +82,11 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 // Health checks (Лаб. 07): reviews-db (MongoDB ping, Unhealthy), redis-cache (Degraded), gRPC Health Checking Protocol.
 // Endpoints /health, /health/live, /health/ready, /health/startup публікує MapDefaultEndpoints (ServiceDefaults).
 builder.AddReviewsHealthChecks();
+
+// Брокер повідомлень (Лаб. 08): IConnection і health check через Aspire.RabbitMQ.Client (ConnectionStrings:messaging).
+// Відгуки — споживач подій Каталогу: черга reviews.catalog-sync (route.renamed) з чергою повторів і DLQ.
+builder.AddEventBus()
+    .DeclareConsumerQueue(CatalogTopology.ReviewsCatalogSync);
 
 // gRPC-сервер (Лаб. 06): HTTP/2 через HTTPS-endpoint (Http1AndHttp2, ALPN), interceptor-и:
 // логування/трасування викликів і перетворення доменних винятків на коди статусу gRPC.

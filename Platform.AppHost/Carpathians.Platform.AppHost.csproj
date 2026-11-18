@@ -23,6 +23,8 @@
     <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.1" />
     <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.6.1" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.6.1" />
+    <!-- Лаб. 08: брокер повідомлень -->
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.6.1" />
   </ItemGroup>
 
 </Project>

@@ -12,6 +12,7 @@
   <!-- Infrastructure підключено лише для реєстрації залежностей під час старту -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\Platform.ServiceDefaults\Carpathians.Platform.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\Platform.EventBus\Carpathians.Platform.EventBus.csproj" />
     <ProjectReference Include="..\Carpathians.Reviews.Application\Carpathians.Reviews.Application.csproj" />
     <ProjectReference Include="..\Carpathians.Reviews.Infrastructure\Carpathians.Reviews.Infrastructure.csproj" />
   </ItemGroup>

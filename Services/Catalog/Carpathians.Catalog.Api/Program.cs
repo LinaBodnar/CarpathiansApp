@@ -12,6 +12,8 @@ using Carpathians.Bll.Validators;
 using Carpathians.Dal.Data;
 using Carpathians.Dal.Interfaces;
 using Carpathians.Dal.Repositories;
+using Carpathians.Platform.EventBus;
+using Carpathians.Platform.EventBus.Topology;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -69,6 +71,11 @@ if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("redis")))
 // Health checks (Лаб. 07): catalog-db (SQL Server, Unhealthy), redis-cache (Degraded), gRPC Health Checking Protocol.
 // Endpoints /health, /health/live, /health/ready, /health/startup публікує MapDefaultEndpoints (ServiceDefaults).
 builder.AddCatalogHealthChecks(connectionString);
+
+// Брокер повідомлень (Лаб. 08): IConnection і health check через Aspire.RabbitMQ.Client (ConnectionStrings:messaging).
+// Каталог — власник маршрутів і publisher: під час старту оголошує topic exchange catalog-events (+ DLX).
+builder.AddEventBus()
+    .DeclareExchange(CatalogTopology.Exchange);
 
 // L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
 builder.AddPlatformCaching();

@@ -1,5 +1,5 @@
 // Orchestrator платформи Carpathians: лише конфігурація ресурсів, без бізнес-логіки.
-// Порядок запуску: бази даних і Redis -> мікросервіси -> Aggregator -> Gateway (ланцюжки WaitFor).
+// Порядок запуску: бази даних, Redis і RabbitMQ -> мікросервіси -> Aggregator -> Gateway (ланцюжки WaitFor).
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -29,6 +29,16 @@ var reviewsDb = mongo.AddDatabase("ReviewsDb", "ReviewContext");    // Лаб. 0
 var redis = builder.AddRedis("redis")
     .WithDataVolume("carpathians-redis-data");
 
+// ---------- Брокер повідомлень (Лаб. 08) ----------
+
+// RabbitMQ у Docker-контейнері; облікові дані генерує Aspire (параметри messaging-username/-password).
+// Volume зберігає durable-черги й persistent-повідомлення між перезапусками.
+// Management UI — http://localhost:15672 (exchanges, черги, bindings, DLQ; ручна публікація повідомлень).
+// Сервіси отримують рядок підключення як ConnectionStrings:messaging.
+var messaging = builder.AddRabbitMQ("messaging")
+    .WithDataVolume("carpathians-rabbitmq-data")
+    .WithManagementPlugin(port: 15672);
+
 // ---------- Мікросервіси (ім'я ресурсу = логічне ім'я для service discovery) ----------
 // WithHttpHealthCheck("/health") (Лаб. 07): Dashboard показує стан кожного ресурсу (Healthy / Degraded / Unhealthy)
 // за health checks сервісу (БД, Redis, gRPC-залежності), а WaitFor чекає, поки залежність стане здоровою,
@@ -41,6 +51,8 @@ var booking = builder.AddProject<Projects.Carpathians_Booking_Api>("booking-api"
     .WaitFor(bookingDb)
     .WithReference(redis)
     .WaitFor(redis)
+    .WithReference(messaging)       // споживає події Каталогу: довідник RouteRefs
+    .WaitFor(messaging)
     .WithHttpHealthCheck("/health");
 
 var catalog = builder.AddProject<Projects.Carpathians_Catalog_Api>("catalog-api", launchProfileName: "https")
@@ -48,6 +60,8 @@ var catalog = builder.AddProject<Projects.Carpathians_Catalog_Api>("catalog-api"
     .WaitFor(catalogDb)
     .WithReference(redis)
     .WaitFor(redis)
+    .WithReference(messaging)       // публікує події про маршрути (catalog-events)
+    .WaitFor(messaging)
     .WithHttpHealthCheck("/health");
 
 var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-api", launchProfileName: "https")
@@ -55,6 +69,8 @@ var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-a
     .WaitFor(reviewsDb)
     .WithReference(redis)
     .WaitFor(redis)
+    .WithReference(messaging)       // споживає події Каталогу: routeName у відгуках і обговореннях
+    .WaitFor(messaging)
     .WithHttpHealthCheck("/health");
 
 // ---------- Aggregator: паралельні gRPC-виклики мікросервісів + кеш агрегованих відповідей у Redis ----------

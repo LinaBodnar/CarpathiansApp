@@ -4,6 +4,7 @@
     <Project Path="Platform.ServiceDefaults/Carpathians.Platform.ServiceDefaults.csproj" />
     <Project Path="Platform.ApiGateway/Carpathians.Platform.ApiGateway.csproj" />
     <Project Path="Platform.Aggregator/Carpathians.Platform.Aggregator.csproj" />
+    <Project Path="Platform.EventBus/Carpathians.Platform.EventBus.csproj" />
   </Folder>
   <Folder Name="/Services/" />
   <Folder Name="/Services/Booking/">

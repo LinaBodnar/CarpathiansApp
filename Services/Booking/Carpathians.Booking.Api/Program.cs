@@ -8,6 +8,8 @@ using Carpathians.Bll.Mapping;
 using Carpathians.Bll.Services;
 using Carpathians.Dal.Interfaces;
 using Carpathians.Dal.Repositories;
+using Carpathians.Platform.EventBus;
+using Carpathians.Platform.EventBus.Topology;
 using Carpathians.Platform.ServiceDefaults.Grpc;
 using Serilog;
 
@@ -38,6 +40,11 @@ if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("redis")))
 // Health checks (Лаб. 07): booking-db (SQL Server, Unhealthy), redis-cache (Degraded), gRPC Health Checking Protocol.
 // Endpoints /health, /health/live, /health/ready, /health/startup публікує MapDefaultEndpoints (ServiceDefaults).
 builder.AddBookingHealthChecks(connectionString);
+
+// Брокер повідомлень (Лаб. 08): IConnection і health check через Aspire.RabbitMQ.Client (ConnectionStrings:messaging).
+// Бронювання — споживач подій Каталогу: черга booking.catalog-sync (route.*) з чергою повторів і DLQ.
+builder.AddEventBus()
+    .DeclareConsumerQueue(CatalogTopology.BookingCatalogSync);
 
 // L1: IMemoryCache з SizeLimit і політиками витіснення + ICacheService (L1 -> L2 -> БД), метрики, health check
 builder.AddPlatformCaching();

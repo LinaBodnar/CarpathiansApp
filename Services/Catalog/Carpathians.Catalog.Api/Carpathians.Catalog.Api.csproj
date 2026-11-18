@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Platform.ServiceDefaults\Carpathians.Platform.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\Platform.EventBus\Carpathians.Platform.EventBus.csproj" />
     <ProjectReference Include="..\Carpathians.Catalog.Bll\Carpathians.Catalog.Bll.csproj" />
     <ProjectReference Include="..\Carpathians.Catalog.Dal\Carpathians.Catalog.Dal.csproj" />
     <ProjectReference Include="..\Carpathians.Catalog.Domain\Carpathians.Catalog.Domain.csproj" />
