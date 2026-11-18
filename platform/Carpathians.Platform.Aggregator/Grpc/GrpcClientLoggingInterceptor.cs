@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Carpathians.Platform.ServiceDefaults.Correlation;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 
@@ -13,7 +14,9 @@ namespace Carpathians.Platform.Aggregator.Grpc;
 /// в одному trace з правильною ієрархією. CorrelationId потрапляє в метадані виклику автоматично —
 /// CorrelationIdHandler з ServiceDefaults додає заголовок до HTTP/2-запиту, що несе gRPC-виклик.</para>
 /// </summary>
-public sealed class GrpcClientLoggingInterceptor(ILogger<GrpcClientLoggingInterceptor> logger) : Interceptor
+public sealed class GrpcClientLoggingInterceptor(
+    IHttpContextAccessor httpContextAccessor,
+    ILogger<GrpcClientLoggingInterceptor> logger) : Interceptor
 {
     public const string ActivitySourceName = "Carpathians.Aggregator.Grpc";
     private const string CacheTrailer = "x-cache";
@@ -34,6 +37,11 @@ public sealed class GrpcClientLoggingInterceptor(ILogger<GrpcClientLoggingInterc
         activity?.SetTag("rpc.service", service);
         activity?.SetTag("rpc.method", method);
         activity?.SetTag("server.address", context.Host);
+
+        // Той самий CorrelationId, що CorrelationIdHandler передає в метаданих виклику (x-correlation-id).
+        var correlationId = httpContextAccessor.HttpContext?.Request.Headers[CorrelationIdMiddleware.HeaderName].ToString();
+        if (!string.IsNullOrEmpty(correlationId))
+            activity?.SetTag(CorrelationIdMiddleware.ActivityTag, correlationId);
 
         var started = Stopwatch.GetTimestamp();
         AsyncUnaryCall<TResponse> call;

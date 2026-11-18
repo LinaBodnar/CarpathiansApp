@@ -276,6 +276,8 @@ curl -i -H "X-Correlation-Id: demo-0001" http://localhost:5000/api/aggregator/bo
 
 **HTTP/2.** Сервіси запускаються з профілем `https` (`launchProfileName: "https"` в AppHost), Kestrel —
 `Http1AndHttp2`: REST через Gateway і gRPC на тому самому HTTPS-endpoint, HTTP/2 узгоджується через ALPN.
+HTTPS використовує сертифікат розробника ASP.NET Core; якщо його ще немає на машині —
+`dotnet dev-certs https --trust` (один раз).
 
 **Помилки.** Некоректний запит → `INVALID_ARGUMENT` (перевірка в методі або FluentValidation);
 доменні винятки перетворює interceptor сервісу: «не знайдено» → `NOT_FOUND`, бізнес-правило → `FAILED_PRECONDITION`,
@@ -293,7 +295,7 @@ deadline 5 с і `CancellationToken`. `RpcException` необов'язковог
 
 | Що | Де видно |
 |---|---|
-| gRPC-spans | Traces: `gateway` → `aggregator` (`AggregateFullBooking`) → span клієнта `carpathians.catalog.v1.CatalogGrpc/GetRoutesByIds` (rpc.system, rpc.service, rpc.method, rpc.grpc.status_code, cache.result) → HTTP/2 POST → span сервера в `catalog-api` (ті самі rpc.* + correlation.id) → SQL / MongoDB / Redis |
+| gRPC-spans | Traces: `gateway` → `aggregator` (`AggregateFullBooking`) → span клієнта `carpathians.catalog.v1.CatalogGrpc/GetRoutesByIds` (rpc.system, rpc.service, rpc.method, rpc.grpc.status_code, cache.result, correlation.id) → `Grpc.Net.Client.GrpcOut` (grpc.method, grpc.status_code) → HTTP/2 POST → span сервера в `catalog-api` (ті самі rpc.* + correlation.id) → SQL / MongoDB / Redis |
 | логи gRPC | Structured logs, `Protocol = grpc`: `gRPC {GrpcMethod} from {Peer}: {GrpcStatus} in {ElapsedMs} ms, cache {CacheResult}`; помилки — Warning/Error зі stack trace |
 | логи кешу | `Cache hit {CacheKey} at {CacheLevel}...`, `Cache miss ...`, `Cache invalidated {CacheKeys}, reason {Reason}`, витіснення, недоступність Redis |
 | метрики кешу | Metrics → Meter `Carpathians.Cache`: `cache.hits`, `cache.misses` (теги `cache.level` = l1/l2, `cache.transport` = http/grpc/background), `cache.hit_ratio`, `cache.memory.entries`, `cache.memory.size`, `cache.evictions`, `cache.invalidations`, `cache.operation.duration`, `cache.distributed.available` |

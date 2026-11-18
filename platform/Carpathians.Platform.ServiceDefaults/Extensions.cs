@@ -34,6 +34,12 @@ public static class Extensions
     /// <summary>ActivitySource драйвера MongoDB (пакет MongoDB.Driver.Core.Extensions.DiagnosticSources).</summary>
     public const string MongoDbActivitySource = "MongoDB.Driver.Core.Extensions.DiagnosticSources";
 
+    /// <summary>
+    /// ActivitySource клієнта gRPC (Grpc.Net.Client): span "Grpc.Net.Client.GrpcOut" з grpc.method і grpc.status_code.
+    /// Без підписки він створюється, але не експортується — і span HTTP/2-запиту втратив би батька в trace.
+    /// </summary>
+    public const string GrpcClientActivitySource = "Grpc.Net.Client";
+
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
@@ -122,6 +128,7 @@ public static class Extensions
                 .AddSource(builder.Environment.ApplicationName)       // власні spans сервісу (Activity API)
                 .AddSource("Carpathians.*")
                 .AddSource(MongoDbActivitySource)                     // MongoDB (Лаб. 04)
+                .AddSource(GrpcClientActivitySource)                  // gRPC-клієнт (Лаб. 06): span виклику між клієнтом і HTTP/2-запитом
                 .AddAspNetCoreInstrumentation(o => o.Filter = context =>
                     !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                     && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath))
