@@ -93,6 +93,44 @@ var identityServer = builder.AddProject<Projects.Carpathians_Platform_IdentitySe
 // Issuer токенів IdentityServer = його HTTPS-адреса; сервіси завантажують ключі з discovery document.
 var identityServerAuthority = identityServer.GetEndpoint("https");
 
+// ---------- Keycloak (Лаб. 09, частина 3): Identity Provider з Authorization Services ----------
+
+// Траєкторія А: контейнер Keycloak + PostgreSQL (дані realm — у базі keycloakdb на volume). Realm, ролі,
+// resource servers, політики, permissions, клієнтів і тестових користувачів створює Pulumi-проєкт infra/keycloak.
+// Admin Console — http://localhost:8080 (admin / пароль із Dashboard: Parameters -> keycloak-admin-password).
+var keycloakDbPassword = builder.AddParameter("keycloak-db-password",
+    new GenerateParameterDefault { MinLength = 16, Special = false },
+    secret: true, persist: true);
+
+var keycloakPostgres = builder.AddPostgres("keycloak-postgres", password: keycloakDbPassword)
+    .WithDataVolume("carpathians-keycloak-postgres-data");
+var keycloakDb = keycloakPostgres.AddDatabase("keycloakdb");
+
+var keycloakAdminPassword = builder.AddParameter("keycloak-admin-password",
+    new GenerateParameterDefault { MinLength = 16, Special = false, MinLower = 2, MinUpper = 2, MinNumeric = 2 },
+    secret: true, persist: true);
+
+var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26.4")
+    .WithArgs("start-dev")
+    .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+    .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", keycloakAdminPassword)
+    .WithEnvironment("KC_HOSTNAME", "http://localhost:8080")      // фіксований issuer токенів
+    .WithEnvironment("KC_HEALTH_ENABLED", "true")
+    // база Keycloak — PostgreSQL (контейнери бачать один одного за іменем ресурсу)
+    .WithEnvironment("KC_DB", "postgres")
+    .WithEnvironment("KC_DB_URL", "jdbc:postgresql://keycloak-postgres:5432/keycloakdb")
+    .WithEnvironment("KC_DB_USERNAME", "postgres")
+    .WithEnvironment("KC_DB_PASSWORD", keycloakDbPassword)
+    .WaitFor(keycloakDb)
+    .WithHttpEndpoint(port: 8080, targetPort: 8080, name: "http")  // фіксований порт: Pulumi і Postman
+    .WithHttpEndpoint(targetPort: 9000, name: "management")        // /health/ready
+    .WithVolume("carpathians-keycloak-data", "/opt/keycloak/data")
+    .WithHttpHealthCheck("/health/ready", endpointName: "management");
+
+// Issuer токенів realm DevRealmDrivers (KC_HOSTNAME + /realms/<realm>).
+const string keycloakAuthority = "http://localhost:8080/realms/DevRealmDrivers";
+var keycloakEndpoint = keycloak.GetEndpoint("http");      // посилання для сервісів: services__keycloak__http__0
+
 // ---------- Мікросервіси (ім'я ресурсу = логічне ім'я для service discovery) ----------
 // Jwt__SecretKey (Лаб. 09): кожен сервіс перевіряє JWT сам, без звернення до Auth Service.
 // WithHttpHealthCheck("/health") (Лаб. 07): Dashboard показує стан кожного ресурсу (Healthy / Degraded / Unhealthy)
@@ -111,6 +149,10 @@ var booking = builder.AddProject<Projects.Carpathians_Booking_Api>("booking-api"
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
     .WithEnvironment("IdentityServer__Audience", "booking-api")
+    .WithEnvironment("Keycloak__Authority", keycloakAuthority)
+    .WithReference(keycloakEndpoint)
+    .WaitFor(keycloak)
+    .WithEnvironment("Keycloak__Audience", "booking-api")
     .WithHttpHealthCheck("/health");
 
 var catalog = builder.AddProject<Projects.Carpathians_Catalog_Api>("catalog-api", launchProfileName: "https")
@@ -123,6 +165,10 @@ var catalog = builder.AddProject<Projects.Carpathians_Catalog_Api>("catalog-api"
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
     .WithEnvironment("IdentityServer__Audience", "catalog-api")
+    .WithEnvironment("Keycloak__Authority", keycloakAuthority)
+    .WithReference(keycloakEndpoint)
+    .WaitFor(keycloak)
+    .WithEnvironment("Keycloak__Audience", "catalog-api")
     .WithHttpHealthCheck("/health");
 
 var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-api", launchProfileName: "https")
@@ -135,6 +181,9 @@ var reviews = builder.AddProject<Projects.Carpathians_Reviews_WebApi>("reviews-a
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
     .WithEnvironment("IdentityServer__Audience", "reviews-api")
+    .WithEnvironment("Keycloak__Authority", keycloakAuthority)
+    .WithReference(keycloakEndpoint)
+    .WaitFor(keycloak)
     .WithHttpHealthCheck("/health");
 
 // Платежі (Лаб. 09): демо-сервіс для перевірки доступу — усі endpoints лише для admin.
@@ -142,6 +191,10 @@ var payments = builder.AddProject<Projects.Carpathians_Payments_Api>("payments-a
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
     .WithEnvironment("IdentityServer__Audience", "payments-api")
+    .WithEnvironment("Keycloak__Authority", keycloakAuthority)
+    .WithReference(keycloakEndpoint)
+    .WaitFor(keycloak)
+    .WithEnvironment("Keycloak__Audience", "payments-api")
     .WithHttpHealthCheck("/health");
 
 // ---------- Aggregator: паралельні gRPC-виклики мікросервісів + кеш агрегованих відповідей у Redis ----------
@@ -158,6 +211,10 @@ var aggregator = builder.AddProject<Projects.Carpathians_Platform_Aggregator>("a
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
     .WithEnvironment("IdentityServer__Audience", "booking-api,catalog-api,reviews-api")
+    .WithEnvironment("Keycloak__Authority", keycloakAuthority)
+    .WithReference(keycloakEndpoint)
+    .WaitFor(keycloak)
+    .WithEnvironment("Keycloak__Audience", "booking-api,catalog-api")
     .WithEnvironment("Clients__AggregatorSecret", aggregatorClientSecret)   // Client Credentials -> gRPC мікросервісів
     .WaitFor(identityServer)
     .WithHttpHealthCheck("/health");
@@ -178,6 +235,10 @@ builder.AddProject<Projects.Carpathians_Platform_ApiGateway>("gateway")
     .WithEnvironment("Jwt__SecretKey", jwtSecret)
     .WithEnvironment("IdentityServer__Authority", identityServerAuthority)
     .WithEnvironment("IdentityServer__Audience", "booking-api,catalog-api,payments-api,reviews-api")
+    .WithEnvironment("Keycloak__Authority", keycloakAuthority)
+    .WithReference(keycloakEndpoint)
+    .WaitFor(keycloak)
+    .WithEnvironment("Keycloak__Audience", "booking-api,catalog-api,payments-api")
     .WithHttpHealthCheck("/health");
 
 builder.Build().Run();

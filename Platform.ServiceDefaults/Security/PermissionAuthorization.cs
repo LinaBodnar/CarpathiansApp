@@ -50,6 +50,13 @@ public static class PermissionClaims
     /// <summary>Claim Keycloak Authorization Services (RPT) з наданими permissions.</summary>
     public const string Authorization = "authorization";
 
+    /// <summary>
+    /// Claim Keycloak з client-ролями resource servers (protocol mapper "permissions", infra/keycloak):
+    /// <c>{"booking-api": ["bookings:read", ...], "catalog-api": [...]}</c>. Client-ролі = permissions,
+    /// realm-ролі admin/manager/user/guest — composite-ролі, що їх групують.
+    /// </summary>
+    public const string KeycloakPermissions = "permissions";
+
     /// <summary>OAuth 2.0 scopes (IdentityServer): кілька claims або один рядок через пробіл.</summary>
     public const string Scope = "scope";
 
@@ -73,6 +80,8 @@ public static class PermissionClaims
         // 1. Keycloak: authorization.permissions[].scopes[]
         foreach (var claim in user.FindAll(Authorization))
             AddKeycloakPermissions(claim.Value, permissions);
+        foreach (var claim in user.FindAll(KeycloakPermissions))
+            AddClientRolePermissions(claim.Value, permissions);
 
         // 2. IdentityServer: scope -> permissions (null — у токені немає жодного відомого scope)
         HashSet<string>? fromScopes = null;
@@ -98,6 +107,31 @@ public static class PermissionClaims
 
     public static bool HasScope(this ClaimsPrincipal user, string scope)
         => user.Identity?.IsAuthenticated == true && user.GetScopes().Contains(scope, StringComparer.Ordinal);
+
+    /// <summary>Claim <c>permissions</c>: JSON-об'єкт «resource server -> масив permissions» або окреме значення.</summary>
+    private static void AddClientRolePermissions(string value, HashSet<string> permissions)
+    {
+        if (!value.StartsWith('{'))
+        {
+            if (value.Length > 0)
+                permissions.Add(value);
+            return;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            foreach (var resourceServer in document.RootElement.EnumerateObject())
+                if (resourceServer.Value.ValueKind == JsonValueKind.Array)
+                    foreach (var permission in resourceServer.Value.EnumerateArray())
+                        if (permission.GetString() is { Length: > 0 } name)
+                            permissions.Add(name);
+        }
+        catch (JsonException)
+        {
+            // некоректний claim — жодних permissions з нього
+        }
+    }
 
     private static void AddKeycloakPermissions(string json, HashSet<string> permissions)
     {

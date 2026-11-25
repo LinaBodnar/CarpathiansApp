@@ -14,6 +14,8 @@ builder.Services.AddSingleton<GatewayMetrics>();
 // "default" — потрібен дійсний токен (інакше 401 без звернення до сервісу), "anonymous" — /auth/** (вхід, реєстрація).
 // Заголовок Authorization передається сервісу без змін: сервіси перевіряють токен самостійно.
 builder.AddPlatformAuthentication();
+// Keycloak (Лаб. 09, частина 3): JWT Bearer на realm DevRealmDrivers — Authority і Audience передає AppHost
+builder.AddKeycloakJwtBearer();
 
 // YARP: маршрути й кластери — у секції ReverseProxy (appsettings.json);
 // адреси http://booking-api, http://catalog-api ... підставляє service discovery Aspire.

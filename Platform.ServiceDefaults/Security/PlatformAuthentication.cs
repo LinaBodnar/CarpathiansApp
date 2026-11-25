@@ -58,7 +58,7 @@ public static class PlatformRoles
 /// Автентифікація запитів у мікросервісах і Gateway: кожен сервіс сам перевіряє підпис, issuer, audience
 /// і термін дії JWT — без звернення до Auth Service на кожен запит.
 /// <para>Схема за замовчуванням "Bearer" — policy scheme: за issuer токена вона передає перевірку
-/// відповідній JwtBearer-схемі (Auth Service; далі в лабі — IdentityServer і Keycloak).</para>
+/// відповідній JwtBearer-схемі: Auth Service, IdentityServer або Keycloak.</para>
 /// </summary>
 public static class PlatformAuthentication
 {
@@ -70,6 +70,9 @@ public static class PlatformAuthentication
 
     /// <summary>Токени Duende IdentityServer (OAuth 2.0 / OIDC): ключі — з discovery document Authority.</summary>
     public const string IdentityServerScheme = "IdentityServer";
+
+    /// <summary>Токени Keycloak (realm DevRealmDrivers): access token і RPT з permissions Authorization Services.</summary>
+    public const string KeycloakScheme = "Keycloak";
 
     /// <summary>Реєструє автентифікацію JWT та авторизацію. Викликати в Program.cs сервісу після AddServiceDefaults().</summary>
     public static TBuilder AddPlatformAuthentication<TBuilder>(this TBuilder builder)
@@ -141,6 +144,43 @@ public static class PlatformAuthentication
 
         builder.Services.AddIssuerScheme(IdentityServerScheme,
             issuer => string.Equals(issuer.TrimEnd('/'), authority, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// JWT Bearer на realm Keycloak (частина 3) — викликається в Program.cs сервісу після AddPlatformAuthentication():
+    /// Authority = адреса realm (Keycloak:Authority від AppHost, напр. http://localhost:8080/realms/DevRealmDrivers),
+    /// Audience = client id resource server (Keycloak:Audience; кілька — через кому).
+    /// Ключі підпису завантажуються з OIDC discovery document realm. Permissions читаються з claims
+    /// <c>authorization</c> (RPT) і <c>permissions</c> (client-ролі resource servers), ролі — з claim <c>role</c>
+    /// (<see cref="PermissionClaims"/>).
+    /// </summary>
+    public static TBuilder AddKeycloakJwtBearer<TBuilder>(this TBuilder builder)
+        where TBuilder : IHostApplicationBuilder
+    {
+        var authority = builder.Configuration["Keycloak:Authority"]?.TrimEnd('/');
+        if (string.IsNullOrEmpty(authority))
+            return builder;                                // сервіс запущено без Keycloak
+
+        var audiences = (builder.Configuration["Keycloak:Audience"] ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        builder.Services.AddAuthentication()
+            .AddJwtBearer(KeycloakScheme, options =>
+            {
+                options.Authority = authority;
+                // Keycloak у Docker під Aspire працює по HTTP лише в Development; в інших середовищах — тільки HTTPS
+                options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+                options.MapInboundClaims = false;
+                options.TokenValidationParameters.ValidateAudience = audiences.Length > 0;
+                options.TokenValidationParameters.ValidAudiences = audiences;
+                options.TokenValidationParameters.NameClaimType = "preferred_username";
+                options.TokenValidationParameters.RoleClaimType = PlatformClaimTypes.Role;
+                options.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
+            });
+
+        builder.Services.AddIssuerScheme(KeycloakScheme,
+            issuer => string.Equals(issuer.TrimEnd('/'), authority, StringComparison.OrdinalIgnoreCase));
+        return builder;
     }
 
     /// <summary>Middleware автентифікації й авторизації (після UseRouting / UseExceptionHandler, до Map*).</summary>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Лаб. 09, частина 3: конфігурація Keycloak як код (Pulumi, C#). Запуск: pulumi up у цій папці. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Carpathians.Infra.Identity</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pulumi" Version="3.*" />
+    <PackageReference Include="Pulumi.Keycloak" Version="6.13.0" />
+  </ItemGroup>
+
+  <!-- Єдине джерело матриці «роль -> permissions»: той самий файл компілюють сервіси (ServiceDefaults). -->
+  <ItemGroup>
+    <Compile Include="..\..\Platform.ServiceDefaults\Security\Permissions.cs" Link="Shared\Permissions.cs" />
+  </ItemGroup>
+
+</Project>

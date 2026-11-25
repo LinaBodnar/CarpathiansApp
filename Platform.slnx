@@ -37,6 +37,9 @@
     <Project Path="Services/Reviews/Carpathians.Reviews.WebApi/Carpathians.Reviews.WebApi.csproj" />
     <Project Path="Services/Reviews/Carpathians.Reviews.Tests/Carpathians.Reviews.Tests.csproj" />
   </Folder>
+  <Folder Name="/Infra/">
+    <Project Path="infra/keycloak/Carpathians.Infra.Keycloak.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
     <File Path="Protos/common/types.proto" />

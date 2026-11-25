@@ -28,6 +28,8 @@
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.6.1" />
     <!-- Лаб. 08: брокер повідомлень -->
     <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.6.1" />
+    <!-- Лаб. 09: PostgreSQL — база Keycloak (траєкторія А) -->
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.6.1" />
   </ItemGroup>
 
 </Project>

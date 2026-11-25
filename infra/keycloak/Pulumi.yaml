@@ -1,0 +1,20 @@
+name: carpathians-keycloak
+runtime: dotnet
+description: Keycloak realm DevRealmDrivers платформи Carpathians — ролі, resource servers, політики, permissions, клієнти, тестові користувачі (Лаб. 09)
+config:
+  testUserPassword:
+    type: string
+    secret: true
+    description: Пароль тестових користувачів alice, bob, carol, dave
+  temporaryPasswords:
+    type: boolean
+    default: true
+    description: Тимчасові паролі тестових користувачів (зміна під час першого входу); false — для прогону матриці через password grant
+  postmanRedirectUri:
+    type: string
+    default: https://oauth.pstmn.io/v1/callback
+  swaggerOrigins:
+    type: array
+    items:
+      type: string
+    description: Origins Swagger UI сервісів (redirect URI і CORS публічного клієнта swagger)

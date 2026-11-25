@@ -28,6 +28,8 @@ builder.AddServiceDefaults();
 
 // Лаб. 09: перевірка JWT (issuer, audience, підпис, термін дії) локально — без звернення до Auth Service
 builder.AddPlatformAuthentication();
+// Keycloak (Лаб. 09, частина 3): JWT Bearer на realm DevRealmDrivers — Authority і Audience передає AppHost
+builder.AddKeycloakJwtBearer();
 // Лаб. 09: політики permissions і scopes (gRPC для Aggregator — scope reviews.read)
 builder.AddPermissionAuthorization();
 

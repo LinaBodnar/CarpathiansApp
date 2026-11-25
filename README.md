@@ -924,3 +924,155 @@ Management UI: `http://localhost:15672`. Логін — `guest`, пароль �
 - Structured logs: фільтр за `CorrelationId` запиту показує ланцюжок у трьох сервісах.
 - Metrics → `Platform.Messaging`: `messaging.process.messages` за `outcome`, `messaging.queue.depth` для `*.dlq`.
 - Resources: стан `messaging`. Health check RabbitMQ входить у `/health/ready` сервісів.
+
+## Проєкт №9 — Автентифікація та авторизація
+
+Платформу захищено трьома підходами — від простого до enterprise. Точка входу для всіх запитів — API Gateway
+(`http://localhost:5000`). Gateway перевіряє JWT перед проксуванням і передає заголовок `Authorization` далі,
+а кожен сервіс сам перевіряє токен і permission на рівні endpoint, без звернення до Identity Provider.
+
+| Що | Де |
+|---|---|
+| Auth Service: ASP.NET Identity, JWT, refresh tokens, email, паролі, ролі | `Services/Auth/Carpathians.Auth.Api/` |
+| Duende IdentityServer: clients, API resources, scopes, Quickstart UI | `Platform.IdentityServer/` |
+| Keycloak як код (Pulumi): realm, resource servers, ролі, клієнти, користувачі | `infra/keycloak/` |
+| Бази `IdentityDb`, `IdentityServerDb`, Keycloak + PostgreSQL | `Platform.AppHost/AppHost.cs` |
+| JWT Bearer для трьох issuer-ів (policy scheme за `iss`) | `Platform.ServiceDefaults/Security/PlatformAuthentication.cs` |
+| Permissions, матриця ролей, `[RequirePermission]`, handler | `Platform.ServiceDefaults/Security/Permissions.cs`, `PermissionAuthorization.cs` |
+| Маршрути `/auth/**`, `/users/**` і перевірка JWT у Gateway | `Platform.ApiGateway/appsettings.json`, `Program.cs` |
+| Client Credentials Aggregator → gRPC мікросервісів | `Platform.Aggregator/Security/ClientCredentialsTokenProvider.cs` |
+| Демо-сервіс платежів (лише admin) | `Services/Payments/Carpathians.Payments.Api/` |
+| Postman-колекція всіх flows і матриці | `docs/postman/Carpathians.Lab09.postman_collection.json` |
+
+Домен перейменовано так: `orders-api` — `booking-api` (бронювання), `products-api` — `catalog-api` (маршрути),
+`payments-api` без змін. Permissions: `bookings:*`, `routes:*`, `payments:*`.
+
+### 1. Auth Service (ASP.NET Identity + JWT)
+
+- Окрема база `IdentityDb` (SQL Server через Aspire). `ApplicationUser : IdentityUser`, `ApplicationDbContext`.
+  `AddIdentity` вимагає пароль від 8 символів, lockout — 5 невдалих спроб на 15 хв. Міграції — `Migrations/`.
+- `JwtTokenService`: access token на **15 хв** з claims `sub`, `unique_name`, `role`. Refresh token на **7 днів**
+  у таблиці з датами створення, закінчення й відкликання. Під час refresh старий токен відкликається і створюється
+  новий (rotation). Refresh token передається лише в HttpOnly cookie, access token — у тілі відповіді.
+- Endpoints: `/auth/register`, `login`, `refresh-token`, `revoke-token`, `logout`, `verify-email`,
+  `resend-verification`, `forgot-password`, `reset-password`, `change-password` і `/users/**` (таблиця 2 методички).
+  - Реєстрація дає роль User і лист підтвердження. Без підтвердженого email вхід заблоковано.
+  - Токени підтвердження й скидання одноразові й мають термін дії. Після скидання пароля всі refresh tokens
+    відкликаються.
+  - Mock email service: `GET /auth/dev/emails` (Development).
+- Ролі User і Admin створюються під час старту разом з адміністратором (пароль — параметр `auth-admin-password`).
+  Admin-endpoints мають `[Authorize(Roles = "Admin")]`, owner-endpoints звіряють `sub` токена з `{id}`.
+
+### 2. Duende IdentityServer (OAuth 2.0 / OpenID Connect)
+
+- Окремий SQL Server `identityserver-sql` з базою `IdentityServerDb`.
+  `AddIdentityServer().AddAspNetIdentity().AddConfigurationStore().AddOperationalStore()`, міграції трьох
+  контекстів (PersistedGrant, Configuration, Application), Quickstart UI (`Pages/`).
+- API resources `booking-api`, `catalog-api`, `payments-api`, `reviews-api`. Scopes `bookings.read/write`,
+  `routes.read/write`, `payments.read/write`, `reviews.read`. Identity resources `openid`, `profile`, `email`, `roles`.
+- Clients:
+  - `postman` — Authorization Code, секрет, refresh token;
+  - `swagger` — public client, Authorization Code + **PKCE**, без секрету;
+  - `aggregator_service` — Client Credentials, у токені немає `sub`.
+- Сервіси перевіряють токен через `Authority` + `Audience`, ключі беруть з discovery document. Scope перетворюється
+  на permissions, перетин зі scopes і ролями користувача гарантує, що клієнт не отримає більше, ніж дозволено користувачу.
+  Aggregator отримує токен Client Credentials (кешований) і додає його до gRPC-викликів.
+
+### 3. Keycloak + Pulumi
+
+**Розгортання (траєкторія А):** у `AppHost` контейнер `quay.io/keycloak/keycloak:26.4` (`start-dev`) з базою
+PostgreSQL `keycloak-postgres/keycloakdb` (volume). Пароль адміністратора — параметр `keycloak-admin-password`.
+Сервіси отримують посилання на Keycloak (`WithReference`, `WaitFor`) і в `Program.cs` викликають
+`builder.AddKeycloakJwtBearer()` — JWT Bearer на realm `DevRealmDrivers` з audience свого resource server.
+
+**Realm як код** (`infra/keycloak`, `pulumi up`):
+
+| Ресурс | Що створюється |
+|---|---|
+| Realm `DevRealmDrivers` | registration, reset password, remember me, themes, access token 15 хв, ротація refresh token |
+| Resource servers | `booking-api`, `catalog-api`, `payments-api` з Authorization Services: ресурс, scopes = permissions |
+| Client-ролі | одна на кожен permission (`bookings:read`, …) на своєму resource server |
+| Realm-ролі | `admin`, `manager`, `user`, `guest` — composite-ролі над client-ролями за матрицею |
+| Permission Policies | role-політика на кожну роль і scope-permission на кожен scope (AFFIRMATIVE) |
+| Clients (фабрика `ClientFactory`) | `postman` (Authorization Code), `swagger` (PKCE), `aggregator` (Client Credentials, composite client-роль `service-reader`) |
+| Mappers | `role` (realm-ролі), `aud` (resource servers), `permissions` (client-ролі → `permissions.<resource server>`) |
+| Users | `alice` (admin), `bob` (manager), `carol` (user), `dave` (guest): email підтверджено, пароль тимчасовий |
+| Outputs | `realmUrl`, `adminConsoleUrl`, `clientIds`, `clientSecrets` (secret), `tokenEndpoint`, `rolePermissions` |
+
+Матриця ролей (таблиця 7) — одна для всіх трьох Identity Provider: `RolePermissionMatrix` у ServiceDefaults.
+Pulumi будує з неї composite-ролі й політики Keycloak, а сервіси — permissions для токенів Auth Service та IdentityServer.
+
+| Роль | booking-api | catalog-api | payments-api |
+|---|---|---|---|
+| admin | усі | усі | усі |
+| manager | read, update, approve | read, update, publish | — |
+| user | read, create | read | — |
+| guest | — | read | — |
+
+`payments-api` свідомо не дає жодного permission ролям manager, user і guest: платежі — найчутливіший ресурс.
+
+**Permission-based авторизація.** `[RequirePermission("bookings:delete")]` стоїть на кожному endpoint бронювань,
+маршрутів і платежів. `PermissionAuthorizationHandler` бере permissions із токена:
+
+- Keycloak RPT — claim `authorization.permissions[].scopes`;
+- Keycloak access token — claim `permissions` (client-ролі через composite realm-ролі);
+- IdentityServer — scopes ∩ ролі;
+- Auth Service — ролі за матрицею.
+
+Немає потрібного permission — **403**, а не 500. Рішення приймає сервіс локально. Офлайн-перевірку матриці
+покривають тести `Services/Booking/Carpathians.Booking.Tests/Security/PermissionMatrixTests.cs`.
+
+**Запуск Pulumi** (з папки `infra/keycloak`, коли ресурс `keycloak` у Dashboard Healthy):
+
+```powershell
+pulumi login --local
+pulumi stack init dev
+pulumi config set --secret keycloak:password <Dashboard -> Parameters -> keycloak-admin-password>
+pulumi config set --secret testUserPassword <пароль тестових користувачів>
+pulumi preview      # realm, resource servers, scopes, ролі, політики, permissions, clients, mappers, users
+pulumi up
+pulumi stack output
+pulumi stack output clientSecrets --show-secrets
+pulumi destroy      # очищення після демонстрації
+```
+
+Паролі тестових користувачів тимчасові: під час першого входу (Authorization Code) Keycloak попросить змінити пароль.
+Для автоматичного прогону матриці через password grant задайте `pulumi config set temporaryPasswords false` і `pulumi up`.
+
+### 4. Перевірка
+
+Postman: імпортуйте `docs/postman/Carpathians.Lab09.postman_collection.json` і заповніть змінні колекції
+(секрети з Dashboard і `pulumi stack output`).
+
+1. **Auth Service:** register → login заблоковано → `GET /auth/dev/emails` → verify-email → login → refresh → logout.
+   - Без токена `GET /api/bookings` через Gateway дає 401.
+   - User на `GET /users` отримує 403.
+   - Декодуйте access token на jwt.io: є `sub`, `unique_name`, `role`.
+2. **IdentityServer:**
+   - Authorization Code (`postman`, вхід на сторінці логіну) повертає токен.
+   - `swagger` без `code_challenge` відхиляється.
+   - Client Credentials дає токен без `sub`, тест у колекції це перевіряє.
+3. **Keycloak:**
+   - Запити `Token alice/bob/carol/dave`, потім RPT для `bob`: у RPT є `authorization.permissions`.
+   - Декодований access token `bob` містить `permissions.booking-api = [bookings:read, bookings:update, bookings:approve]`.
+4. **Матриця:** Runner → папка «4. Матриця доступу». Кожен запит перевіряє очікуваний результат
+   (дозволено — не 401/403, заборонено — 403). Для DELETE використовуються неіснуючі id (`missingId`),
+   тож admin отримує 404, а не видаляє дані.
+
+Таблиця перевірки матриці. Колонку «Фактично» заповніть з результатів Runner:
+
+| Endpoint | Permission | admin | manager | user | guest | Фактично |
+|---|---|---|---|---|---|---|
+| `GET /api/bookings` | `bookings:read` | ✓ 2xx | ✓ 2xx | ✓ 2xx | ✗ 403 |  |
+| `POST /api/bookings` | `bookings:create` | ✓ 2xx | ✗ 403 | ✓ 2xx | ✗ 403 |  |
+| `PUT /api/bookings/{id}` | `bookings:update` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
+| `DELETE /api/bookings/{id}` | `bookings:delete` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
+| `POST /api/bookings/{id}/approve` | `bookings:approve` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
+| `GET /api/routes` | `routes:read` | ✓ 2xx | ✓ 2xx | ✓ 2xx | ✓ 2xx |  |
+| `POST /api/routes` | `routes:create` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
+| `PUT /api/routes/{id}` | `routes:update` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
+| `DELETE /api/routes/{id}` | `routes:delete` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
+| `POST /api/routes/{id}/publish` | `routes:publish` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
+| `GET /api/payments` | `payments:read` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
+| `POST /api/payments/process` | `payments:process` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
+| `POST /api/payments/refund` | `payments:refund` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |

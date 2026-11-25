@@ -10,6 +10,8 @@ builder.AddServiceDefaults();
 // Лаб. 09: перевірка JWT локально + permission-based авторизація: політика на кожен permission
 // (payments:read, payments:process, payments:refund), обробник читає permissions із токена.
 builder.AddPlatformAuthentication();
+// Keycloak (Лаб. 09, частина 3): JWT Bearer на realm DevRealmDrivers — Authority і Audience передає AppHost
+builder.AddKeycloakJwtBearer();
 builder.AddPermissionAuthorization();
 
 builder.Services.AddSingleton(TimeProvider.System);

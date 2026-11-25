@@ -1,0 +1,3333 @@
+{
+  "info": {
+    "name": "Carpathians — Лаб. 09: автентифікація та авторизація",
+    "description": "Потоки Auth Service (ASP.NET Identity + JWT), Duende IdentityServer (Authorization Code, PKCE, Client Credentials), Keycloak (password grant, RPT, Client Credentials, Authorization Code) і перевірка матриці доступу (таблиці 3.3.1–3.3.3). Спершу виконайте запити 'Token ...' у папці Keycloak, потім Runner для папки 'Матриця доступу' — тести показують фактичні коди.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth Service (ASP.NET Identity + JWT)",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/register"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"{{newUser}}\",\n  \"email\": \"{{newUser}}@carpathians.local\",\n  \"password\": \"{{newUserPassword}}\",\n  \"displayName\": \"Lab 09\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('newUserId', pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login before email verification -> blocked",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/login"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"{{newUser}}\",\n  \"password\": \"{{newUserPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login blocked (not 200)', () => pm.expect(pm.response.code).to.not.eql(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dev mailbox (verification and reset letters)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{authDirect}}/auth/dev/emails"
+            },
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Mock email service (Development): токени підтвердження email і скидання пароля."
+          }
+        },
+        {
+          "name": "Verify email",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/verify-email"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{newUserId}}\",\n  \"token\": \"<token з листа>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Resend verification",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/resend-verification"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{newUser}}@carpathians.local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Login -> access token (body) + refresh token (HttpOnly cookie)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/login"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"{{newUser}}\",\n  \"password\": \"{{newUserPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('authToken', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh token (rotation: old refresh revoked)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/refresh-token"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('authToken', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/change-password"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{newUserPassword}}\",\n  \"newPassword\": \"{{newUserPassword}}2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/forgot-password"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{newUser}}@carpathians.local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Reset password (one-time token, revokes all refresh tokens)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/reset-password"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{newUser}}@carpathians.local\",\n  \"token\": \"<token з листа>\",\n  \"newPassword\": \"{{newUserPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Revoke token",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/revoke-token"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/logout"
+            },
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /users as User -> 403",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/users"
+            },
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 for User', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/bookings without token -> 401",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/api/bookings"
+            },
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 without token', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Admin",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/auth/login"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"admin\",\n  \"password\": \"{{authAdminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('authAdminToken', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /users (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/users"
+            },
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /users/{id}/refresh-tokens",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/users/{{newUserId}}/refresh-tokens"
+            },
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /users/{id}/roles (Admin)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/users/{{newUserId}}/roles"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"Admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /users/{id}/roles/{role} (Admin)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{gateway}}/users/{{newUserId}}/roles/Admin"
+            },
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authAdminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Duende IdentityServer (OAuth 2.0)",
+      "item": [
+        {
+          "name": "Discovery document",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{identityServer}}/.well-known/openid-configuration"
+            },
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Authorization Code (postman) -> GET /api/bookings",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/api/bookings"
+            },
+            "header": [],
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{identityServer}}/connect/authorize",
+                  "type": "string"
+                },
+                {
+                  "key": "accessTokenUrl",
+                  "value": "{{identityServer}}/connect/token",
+                  "type": "string"
+                },
+                {
+                  "key": "clientId",
+                  "value": "postman",
+                  "type": "string"
+                },
+                {
+                  "key": "clientSecret",
+                  "value": "{{identityServerPostmanSecret}}",
+                  "type": "string"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile roles bookings.read bookings.write routes.read routes.write offline_access",
+                  "type": "string"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "https://oauth.pstmn.io/v1/callback",
+                  "type": "string"
+                },
+                {
+                  "key": "useBrowser",
+                  "value": true,
+                  "type": "boolean"
+                },
+                {
+                  "key": "tokenName",
+                  "value": "identityserver-postman",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Authorization -> Get New Access Token: вхід alice/bob/carol/dave на сторінці логіну IdentityServer."
+          }
+        },
+        {
+          "name": "Public client swagger WITHOUT PKCE -> rejected",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{identityServer}}/connect/authorize?client_id=swagger&response_type=code&scope=openid%20bookings.read&redirect_uri=https://localhost:7047/swagger/oauth2-redirect.html"
+            },
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Без code_challenge IdentityServer відповідає помилкою invalid_request (code challenge required)."
+          }
+        },
+        {
+          "name": "Client Credentials (aggregator_service)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{identityServer}}/connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "aggregator_service"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{aggregatorSecret}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "bookings.read routes.read"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('isServiceToken', json.access_token);",
+                  "const payload = JSON.parse(atob(json.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));",
+                  "pm.test('no sub in Client Credentials token', () => pm.expect(payload.sub).to.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Service token -> GET /api/routes (routes.read)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/api/routes"
+            },
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{isServiceToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Service token -> POST /api/bookings -> 403 (no bookings.write)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway}}/api/bookings"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{isServiceToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Keycloak (Pulumi realm DevRealmDrivers)",
+      "item": [
+        {
+          "name": "Token alice (admin) — password grant",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{keycloak}}/protocol/openid-connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "postman"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{keycloakPostmanSecret}}"
+                },
+                {
+                  "key": "username",
+                  "value": "alice"
+                },
+                {
+                  "key": "password",
+                  "value": "{{keycloakUserPassword}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('kc_admin', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token bob (manager) — password grant",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{keycloak}}/protocol/openid-connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "postman"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{keycloakPostmanSecret}}"
+                },
+                {
+                  "key": "username",
+                  "value": "bob"
+                },
+                {
+                  "key": "password",
+                  "value": "{{keycloakUserPassword}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('kc_manager', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token carol (user) — password grant",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{keycloak}}/protocol/openid-connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "postman"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{keycloakPostmanSecret}}"
+                },
+                {
+                  "key": "username",
+                  "value": "carol"
+                },
+                {
+                  "key": "password",
+                  "value": "{{keycloakUserPassword}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('kc_user', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token dave (guest) — password grant",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{keycloak}}/protocol/openid-connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "postman"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{keycloakPostmanSecret}}"
+                },
+                {
+                  "key": "username",
+                  "value": "dave"
+                },
+                {
+                  "key": "password",
+                  "value": "{{keycloakUserPassword}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('kc_guest', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "RPT bob (manager) for booking-api: authorization.permissions",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{keycloak}}/protocol/openid-connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "urn:ietf:params:oauth:grant-type:uma-ticket"
+                },
+                {
+                  "key": "audience",
+                  "value": "booking-api"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{kc_manager}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('kc_manager_rpt', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager RPT -> PUT /api/bookings/{id}",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{gateway}}/api/bookings/{{bookingId}}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"rpt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{kc_manager_rpt}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Client Credentials (aggregator)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{keycloak}}/protocol/openid-connect/token"
+            },
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "aggregator"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{keycloakAggregatorSecret}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('token received', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('kc_service', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Authorization Code (postman) -> GET /api/routes",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway}}/api/routes"
+            },
+            "header": [],
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "string"
+                },
+                {
+                  "key": "authUrl",
+                  "value": "{{keycloak}}/protocol/openid-connect/auth",
+                  "type": "string"
+                },
+                {
+                  "key": "accessTokenUrl",
+                  "value": "{{keycloak}}/protocol/openid-connect/token",
+                  "type": "string"
+                },
+                {
+                  "key": "clientId",
+                  "value": "postman",
+                  "type": "string"
+                },
+                {
+                  "key": "clientSecret",
+                  "value": "{{keycloakPostmanSecret}}",
+                  "type": "string"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid",
+                  "type": "string"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "https://oauth.pstmn.io/v1/callback",
+                  "type": "string"
+                },
+                {
+                  "key": "useBrowser",
+                  "value": true,
+                  "type": "boolean"
+                },
+                {
+                  "key": "tokenName",
+                  "value": "keycloak-postman",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Матриця доступу (Keycloak, таблиці 3.3.1–3.3.3)",
+      "item": [
+        {
+          "name": "admin (alice)",
+          "item": [
+            {
+              "name": "GET /api/bookings [bookings:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'GET /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings [bookings:create] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customerId\": 1,\n  \"items\": [\n    {\n      \"departureId\": 1,\n      \"seats\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'POST /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/bookings/{id} [bookings:update] -> allowed",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"notes\": \"matrix check\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'PUT /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/bookings/{id} [bookings:delete] -> allowed",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'DELETE /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings/{id}/approve [bookings:approve] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}/approve"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'POST /api/bookings/{id}/approve', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/routes [routes:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'GET /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes [routes:create] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'POST /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/routes/{id} [routes:update] -> allowed",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{routeId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'PUT /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/routes/{id} [routes:delete] -> allowed",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'DELETE /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes/{id}/publish [routes:publish] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}/publish"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'POST /api/routes/{id}/publish', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/payments [payments:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/payments"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'GET /api/payments', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/process [payments:process] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/process"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"bookingId\": 1,\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'POST /api/payments/process', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/refund [payments:refund] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/refund"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentId\": \"demo\",\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_admin}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('admin', 'POST /api/payments/refund', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "manager (bob)",
+          "item": [
+            {
+              "name": "GET /api/bookings [bookings:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('manager', 'GET /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings [bookings:create] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customerId\": 1,\n  \"items\": [\n    {\n      \"departureId\": 1,\n      \"seats\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'POST /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/bookings/{id} [bookings:update] -> allowed",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"notes\": \"matrix check\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('manager', 'PUT /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/bookings/{id} [bookings:delete] -> 403",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'DELETE /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings/{id}/approve [bookings:approve] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}/approve"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('manager', 'POST /api/bookings/{id}/approve', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/routes [routes:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('manager', 'GET /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes [routes:create] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'POST /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/routes/{id} [routes:update] -> allowed",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{routeId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('manager', 'PUT /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/routes/{id} [routes:delete] -> 403",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'DELETE /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes/{id}/publish [routes:publish] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}/publish"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('manager', 'POST /api/routes/{id}/publish', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/payments [payments:read] -> 403",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/payments"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'GET /api/payments', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/process [payments:process] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/process"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"bookingId\": 1,\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'POST /api/payments/process', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/refund [payments:refund] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/refund"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentId\": \"demo\",\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_manager}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('manager', 'POST /api/payments/refund', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "user (carol)",
+          "item": [
+            {
+              "name": "GET /api/bookings [bookings:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('user', 'GET /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings [bookings:create] -> allowed",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customerId\": 1,\n  \"items\": [\n    {\n      \"departureId\": 1,\n      \"seats\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('user', 'POST /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/bookings/{id} [bookings:update] -> 403",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"notes\": \"matrix check\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'PUT /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/bookings/{id} [bookings:delete] -> 403",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'DELETE /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings/{id}/approve [bookings:approve] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}/approve"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'POST /api/bookings/{id}/approve', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/routes [routes:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('user', 'GET /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes [routes:create] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'POST /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/routes/{id} [routes:update] -> 403",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{routeId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'PUT /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/routes/{id} [routes:delete] -> 403",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'DELETE /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes/{id}/publish [routes:publish] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}/publish"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'POST /api/routes/{id}/publish', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/payments [payments:read] -> 403",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/payments"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'GET /api/payments', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/process [payments:process] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/process"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"bookingId\": 1,\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'POST /api/payments/process', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/refund [payments:refund] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/refund"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentId\": \"demo\",\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_user}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('user', 'POST /api/payments/refund', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "guest (dave)",
+          "item": [
+            {
+              "name": "GET /api/bookings [bookings:read] -> 403",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'GET /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings [bookings:create] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customerId\": 1,\n  \"items\": [\n    {\n      \"departureId\": 1,\n      \"seats\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'POST /api/bookings', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/bookings/{id} [bookings:update] -> 403",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"notes\": \"matrix check\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'PUT /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/bookings/{id} [bookings:delete] -> 403",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'DELETE /api/bookings/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/bookings/{id}/approve [bookings:approve] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/bookings/{{bookingId}}/approve"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'POST /api/bookings/{id}/approve', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/routes [routes:read] -> allowed",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('allowed: not 401/403', () => pm.expect([401, 403]).to.not.include(pm.response.code));",
+                      "console.log('guest', 'GET /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes [routes:create] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'POST /api/routes', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /api/routes/{id} [routes:update] -> 403",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{routeId}}"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'PUT /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "DELETE /api/routes/{id} [routes:delete] -> 403",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'DELETE /api/routes/{id}', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/routes/{id}/publish [routes:publish] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/routes/{{missingId}}/publish"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'POST /api/routes/{id}/publish', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /api/payments [payments:read] -> 403",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{gateway}}/api/payments"
+                },
+                "header": [],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'GET /api/payments', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/process [payments:process] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/process"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"bookingId\": 1,\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'POST /api/payments/process', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /api/payments/refund [payments:refund] -> 403",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{gateway}}/api/payments/refund"
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"paymentId\": \"demo\",\n  \"amount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{kc_guest}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('forbidden: 403', () => pm.response.to.have.status(403));",
+                      "console.log('guest', 'POST /api/payments/refund', pm.response.code);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "gateway",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "authDirect",
+      "value": "https://localhost:7060"
+    },
+    {
+      "key": "identityServer",
+      "value": "https://localhost:7101"
+    },
+    {
+      "key": "keycloak",
+      "value": "http://localhost:8080/realms/DevRealmDrivers"
+    },
+    {
+      "key": "newUser",
+      "value": "lab09.tourist"
+    },
+    {
+      "key": "newUserPassword",
+      "value": "Tourist#2026"
+    },
+    {
+      "key": "newUserId",
+      "value": ""
+    },
+    {
+      "key": "authAdminPassword",
+      "value": "<Dashboard: auth-admin-password>"
+    },
+    {
+      "key": "identityServerPostmanSecret",
+      "value": "postman-secret"
+    },
+    {
+      "key": "aggregatorSecret",
+      "value": "<Dashboard: aggregator-client-secret>"
+    },
+    {
+      "key": "keycloakPostmanSecret",
+      "value": "<pulumi stack output clientSecrets --show-secrets>"
+    },
+    {
+      "key": "keycloakAggregatorSecret",
+      "value": "<pulumi stack output clientSecrets --show-secrets>"
+    },
+    {
+      "key": "keycloakUserPassword",
+      "value": "<pulumi config testUserPassword>"
+    },
+    {
+      "key": "bookingId",
+      "value": "1"
+    },
+    {
+      "key": "routeId",
+      "value": "1"
+    },
+    {
+      "key": "missingId",
+      "value": "999999"
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    },
+    {
+      "key": "authAdminToken",
+      "value": ""
+    },
+    {
+      "key": "isServiceToken",
+      "value": ""
+    },
+    {
+      "key": "kc_admin",
+      "value": ""
+    },
+    {
+      "key": "kc_manager",
+      "value": ""
+    },
+    {
+      "key": "kc_user",
+      "value": ""
+    },
+    {
+      "key": "kc_guest",
+      "value": ""
+    },
+    {
+      "key": "kc_manager_rpt",
+      "value": ""
+    },
+    {
+      "key": "kc_service",
+      "value": ""
+    }
+  ]
+}
