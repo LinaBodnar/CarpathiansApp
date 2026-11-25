@@ -1,0 +1,76 @@
+{
+  "note": "Keycloak access token, bob (manager): role + permissions (client-ролі)",
+  "payload": {
+    "exp": 1795624030,
+    "iat": 1795623130,
+    "jti": "onrtro:f009552f-6f96-230f-6b11-8c75d7454330",
+    "iss": "http://localhost:8080/realms/DevRealmDrivers",
+    "aud": [
+      "catalog-api",
+      "payments-api",
+      "booking-api",
+      "account"
+    ],
+    "sub": "26cfff84-2de8-4dfb-882a-67993497a9f7",
+    "typ": "Bearer",
+    "azp": "postman",
+    "sid": "07910f21-030c-e274-ef92-febf431d05dc",
+    "acr": "1",
+    "realm_access": {
+      "roles": [
+        "manager",
+        "offline_access",
+        "uma_authorization",
+        "default-roles-devrealmdrivers"
+      ]
+    },
+    "resource_access": {
+      "catalog-api": {
+        "roles": [
+          "routes:update",
+          "routes:publish",
+          "routes:read"
+        ]
+      },
+      "booking-api": {
+        "roles": [
+          "bookings:read",
+          "bookings:update",
+          "bookings:approve"
+        ]
+      },
+      "account": {
+        "roles": [
+          "manage-account",
+          "manage-account-links",
+          "view-profile"
+        ]
+      }
+    },
+    "scope": "openid profile email",
+    "email_verified": true,
+    "role": [
+      "manager",
+      "offline_access",
+      "uma_authorization",
+      "default-roles-devrealmdrivers"
+    ],
+    "permissions": {
+      "catalog-api": [
+        "routes:update",
+        "routes:publish",
+        "routes:read"
+      ],
+      "booking-api": [
+        "bookings:read",
+        "bookings:update",
+        "bookings:approve"
+      ]
+    },
+    "name": "Bob Test",
+    "preferred_username": "bob",
+    "given_name": "Bob",
+    "family_name": "Test",
+    "email": "bob@carpathians.local"
+  }
+}

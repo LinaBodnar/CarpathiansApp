@@ -31,6 +31,10 @@
     <PackageReference Include="Grpc.Core.Api" Version="2.76.0" />
     <!-- Лаб. 09: перевірка JWT (Auth Service, IdentityServer, Keycloak) у Gateway і мікросервісах -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <!-- Одна версія IdentityModel в усіх сервісах: JwtBearer 8.0 тягне 7.1.2, а інші пакети (EF, Aspire) — 8.x;
+         змішані версії (Tokens 8.x + Jwt 7.x) читають claims токена як порожні (iss = null) -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.16.0" />
   </ItemGroup>
 
 </Project>

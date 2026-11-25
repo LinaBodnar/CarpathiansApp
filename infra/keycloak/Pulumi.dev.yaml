@@ -1,7 +1,11 @@
 # Стек dev: Keycloak з Aspire AppHost (http://localhost:8080).
+
 # Секрети додаються командами (у файлі зберігаються лише в зашифрованому вигляді):
+
 #   pulumi config set --secret keycloak:password <keycloak-admin-password з Dashboard>
+
 #   pulumi config set --secret testUserPassword <пароль тестових користувачів>
+
 config:
   keycloak:url: http://localhost:8080
   keycloak:realm: master
@@ -11,3 +15,9 @@ config:
     - https://localhost:7047
     - https://localhost:7052
     - https://localhost:7070
+  keycloak:password:
+    secure: v1:Pg9s9Aj5s9yIdmMe:whHN9u+D+gvgXnpkIinruZVxhJDlr0/urAdcvyfkYw4=
+  carpathians-keycloak:testUserPassword:
+    secure: v1:UndyH8mgSFffwWfD:MiU2OJfnbPA2qqrjl5kueShudy5FyMpXM9Y93+fhybk=
+  carpathians-keycloak:temporaryPasswords: "false"
+encryptionsalt: v1:qn49gyDNwlQ=:v1:6WKVKSDrWCd64YDD:gbNJgfIiQacdbAo9dcZcBgOb4SVsKg==

@@ -222,6 +222,8 @@ public static class PlatformAuthentication
             return AuthServiceScheme;
 
         var issuer = handler.ReadJwtToken(token).Issuer;
+        if (string.IsNullOrEmpty(issuer))
+            return AuthServiceScheme;
         var issuers = context.RequestServices.GetRequiredService<IOptions<IssuerSchemeOptions>>().Value;
         foreach (var (scheme, matches) in issuers.Schemes)
             if (matches(issuer))

@@ -1,0 +1,66 @@
+{
+  "note": "Keycloak RPT, bob (manager), audience booking-api: authorization.permissions",
+  "payload": {
+    "exp": 1795624030,
+    "iat": 1795623130,
+    "jti": "ntrtna:016e70bd-89a6-5e74-4fd4-24fa8aeafbf2",
+    "iss": "http://localhost:8080/realms/DevRealmDrivers",
+    "aud": "booking-api",
+    "sub": "26cfff84-2de8-4dfb-882a-67993497a9f7",
+    "typ": "Bearer",
+    "azp": "postman",
+    "sid": "07910f21-030c-e274-ef92-febf431d05dc",
+    "acr": "1",
+    "realm_access": {
+      "roles": [
+        "manager",
+        "offline_access",
+        "uma_authorization",
+        "default-roles-devrealmdrivers"
+      ]
+    },
+    "resource_access": {
+      "catalog-api": {
+        "roles": [
+          "routes:update",
+          "routes:publish",
+          "routes:read"
+        ]
+      },
+      "booking-api": {
+        "roles": [
+          "bookings:read",
+          "bookings:update",
+          "bookings:approve"
+        ]
+      },
+      "account": {
+        "roles": [
+          "manage-account",
+          "manage-account-links",
+          "view-profile"
+        ]
+      }
+    },
+    "authorization": {
+      "permissions": [
+        {
+          "scopes": [
+            "bookings:read",
+            "bookings:update",
+            "bookings:approve"
+          ],
+          "rsid": "a6e8fee2-951c-4f86-b1bf-b052ffc1f2e0",
+          "rsname": "bookings"
+        }
+      ]
+    },
+    "scope": "profile email",
+    "email_verified": true,
+    "name": "Bob Test",
+    "preferred_username": "bob",
+    "given_name": "Bob",
+    "family_name": "Test",
+    "email": "bob@carpathians.local"
+  }
+}

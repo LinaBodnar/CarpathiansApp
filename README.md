@@ -1059,20 +1059,44 @@ Postman: імпортуйте `docs/postman/Carpathians.Lab09.postman_collection
    (дозволено — не 401/403, заборонено — 403). Для DELETE використовуються неіснуючі id (`missingId`),
    тож admin отримує 404, а не видаляє дані.
 
-Таблиця перевірки матриці. Колонку «Фактично» заповніть з результатів Runner:
+Таблиця перевірки матриці (токени Keycloak `alice`/`bob`/`carol`/`dave`, запити через Gateway).
+✓ — доступ дозволено: запит дійшов до бізнес-логіки (2xx; 400 — валідація порожнього тіла; 404 — тестовий
+неіснуючий id, щоб admin нічого не видалив). ✗ — 403 від `[RequirePermission]`.
 
-| Endpoint | Permission | admin | manager | user | guest | Фактично |
+| Endpoint | Permission | admin | manager | user | guest | Результат |
 |---|---|---|---|---|---|---|
-| `GET /api/bookings` | `bookings:read` | ✓ 2xx | ✓ 2xx | ✓ 2xx | ✗ 403 |  |
-| `POST /api/bookings` | `bookings:create` | ✓ 2xx | ✗ 403 | ✓ 2xx | ✗ 403 |  |
-| `PUT /api/bookings/{id}` | `bookings:update` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
-| `DELETE /api/bookings/{id}` | `bookings:delete` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
-| `POST /api/bookings/{id}/approve` | `bookings:approve` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
-| `GET /api/routes` | `routes:read` | ✓ 2xx | ✓ 2xx | ✓ 2xx | ✓ 2xx |  |
-| `POST /api/routes` | `routes:create` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
-| `PUT /api/routes/{id}` | `routes:update` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
-| `DELETE /api/routes/{id}` | `routes:delete` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
-| `POST /api/routes/{id}/publish` | `routes:publish` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 |  |
-| `GET /api/payments` | `payments:read` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
-| `POST /api/payments/process` | `payments:process` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
-| `POST /api/payments/refund` | `payments:refund` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 |  |
+| `GET /api/bookings` | `bookings:read` | ✓ 200 | ✓ 200 | ✓ 200 | ✗ 403 | так (живий прогін) |
+| `POST /api/bookings` | `bookings:create` | ✓ 400 | ✗ 403 | ✓ 400 | ✗ 403 | так (живий прогін) |
+| `PUT /api/bookings/{id}` | `bookings:update` | ✓ 400 | ✓ 400 | ✗ 403 | ✗ 403 | так (живий прогін) |
+| `DELETE /api/bookings/{id}` | `bookings:delete` | ✓ 404 | ✗ 403 | ✗ 403 | ✗ 403 | так (живий прогін) |
+| `POST /api/bookings/{id}/approve` | `bookings:approve` | ✓ 404 | ✓ 404 | ✗ 403 | ✗ 403 | так (живий прогін) |
+| `GET /api/routes` | `routes:read` | ✓ 2xx | ✓ 2xx | ✓ 2xx | ✓ 2xx | очікувано, підтверджено тестами |
+| `POST /api/routes` | `routes:create` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+| `PUT /api/routes/{id}` | `routes:update` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+| `DELETE /api/routes/{id}` | `routes:delete` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+| `POST /api/routes/{id}/publish` | `routes:publish` | ✓ 2xx | ✓ 2xx | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+| `GET /api/payments` | `payments:read` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+| `POST /api/payments/process` | `payments:process` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+| `POST /api/payments/refund` | `payments:refund` | ✓ 2xx | ✗ 403 | ✗ 403 | ✗ 403 | очікувано, підтверджено тестами |
+
+Бронювання (`booking-api`) перевірено живим прогоном: фактичні коди в таблиці, сирі дані — `docs/lab09/matrix-results.json`.
+Ключовий сценарій методички підтверджено: **manager — 400/200 на `PUT /api/bookings/{id}` (доступ є), 403 на
+`DELETE /api/bookings/{id}`**. Для `catalog-api` і `payments-api` під час прогону проксі Aspire повертали таймаут
+(залишки процесів попередніх запусків після збою Docker), тому для них наведено очікувані коди; ту саму матрицю
+для всіх трьох сервісів перевіряють тести `Services/Booking/Carpathians.Booking.Tests/Security/PermissionMatrixTests.cs`
+(той самий `PermissionAuthorizationHandler`, що працює в кожному сервісі). Під час прогону знайдено й виправлено
+конфлікт версій IdentityModel у Каталозі (`Tokens` 8.x + `Jwt` 7.x читали `iss` як `null`): версію 8.16 зафіксовано
+в `Platform.ServiceDefaults`.
+
+### 5. Декодовані JWT
+
+Payload-и токенів (без підпису), отримані на живому запуску, — `docs/lab09/jwt/`:
+
+| Файл | Що показує |
+|---|---|
+| `keycloak-manager-bob.json` | access token Keycloak, `bob` (manager): `role` і `permissions` — `booking-api: bookings:read, bookings:update, bookings:approve`, `catalog-api: routes:read, routes:update, routes:publish` |
+| `keycloak-manager-bob-rpt.json` | RPT Keycloak (uma-ticket, audience `booking-api`): `authorization.permissions[].scopes` |
+| `keycloak-client-credentials-aggregator.json` | Client Credentials Keycloak: `service-account-aggregator`, permissions лише `bookings:read`, `routes:read` |
+| `identityserver-client-credentials.json` | Client Credentials IdentityServer (`aggregator_service`): **немає `sub`**, scopes `bookings.read`, `routes.read` |
+
+Public client `swagger` без PKCE IdentityServer відхиляє (редирект на сторінку помилки `invalid_request`).

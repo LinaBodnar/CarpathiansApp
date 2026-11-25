@@ -1,0 +1,309 @@
+{
+  "tokens": {
+    "keycloak-admin": true,
+    "keycloak-manager": true,
+    "keycloak-user": true,
+    "keycloak-guest": true
+  },
+  "matrix": {
+    "GET /api/bookings": {
+      "permission": "bookings:read",
+      "admin": {
+        "status": 200,
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": 200,
+        "allowed": true,
+        "passed": true
+      },
+      "user": {
+        "status": 200,
+        "allowed": true,
+        "passed": true
+      },
+      "guest": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      }
+    },
+    "POST /api/bookings": {
+      "permission": "bookings:create",
+      "admin": {
+        "status": 400,
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      },
+      "user": {
+        "status": 400,
+        "allowed": true,
+        "passed": true
+      },
+      "guest": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      }
+    },
+    "PUT /api/bookings/{id}": {
+      "permission": "bookings:update",
+      "admin": {
+        "status": 400,
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": 400,
+        "allowed": true,
+        "passed": true
+      },
+      "user": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      },
+      "guest": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      }
+    },
+    "DELETE /api/bookings/{id}": {
+      "permission": "bookings:delete",
+      "admin": {
+        "status": 404,
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      },
+      "user": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      },
+      "guest": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      }
+    },
+    "POST /api/bookings/{id}/approve": {
+      "permission": "bookings:approve",
+      "admin": {
+        "status": 404,
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": 404,
+        "allowed": true,
+        "passed": true
+      },
+      "user": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      },
+      "guest": {
+        "status": 403,
+        "allowed": false,
+        "passed": true
+      }
+    },
+    "GET /api/routes": {
+      "permission": "routes:read",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      }
+    },
+    "POST /api/routes": {
+      "permission": "routes:create",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      }
+    },
+    "PUT /api/routes/{id}": {
+      "permission": "routes:update",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      }
+    },
+    "DELETE /api/routes/{id}": {
+      "permission": "routes:delete",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      }
+    },
+    "POST /api/routes/{id}/publish": {
+      "permission": "routes:publish",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      }
+    },
+    "GET /api/payments": {
+      "permission": "payments:read",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      }
+    },
+    "POST /api/payments/process": {
+      "permission": "payments:process",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "user": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      }
+    },
+    "POST /api/payments/refund": {
+      "permission": "payments:refund",
+      "admin": {
+        "status": "timeout",
+        "allowed": true,
+        "passed": true
+      },
+      "manager": {
+        "status": "timeout",
+        "allowed": false,
+        "passed": false
+      },
+      "user": {
+        "status": 401,
+        "allowed": false,
+        "passed": false
+      },
+      "guest": {
+        "status": 401,
+        "allowed": false,
+        "passed": false
+      }
+    }
+  }
+}
